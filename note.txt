@@ -1,0 +1,7 @@
+sysctl net/core/bpf_jit_enable=1
+
+ip link add dev veth0 type veth peer name veth1
+ip link set dev veth0 up
+ip link set dev veth1 up
+
+cat /sys/kernel/debug/tracing/trace_pipe
