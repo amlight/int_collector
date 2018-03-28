@@ -26,7 +26,7 @@ struct eth_tp {
     u16 type;
 } __attribute__((packed));
 
-struct telemetry_report_tp {
+struct telemetry_report_t {
 #if defined(__BIG_ENDIAN_BITFIELD)
     u8  ver:4,
         nProto:4;
@@ -53,14 +53,14 @@ struct telemetry_report_tp {
     u32 ingressTimestamp;
 } __attribute__((packed));
 
-struct INT_shim_tp {
+struct INT_shim_t {
     u8 type;
     u8 shimRsvd1;
     u8 length;
     u8 shimRsvd2;
 } __attribute__((packed));
 
-struct INT_md_fix_yp {
+struct INT_md_fix_t {
 #if defined(__BIG_ENDIAN_BITFIELD)
     u8  ver:4,
         rep:2,
@@ -86,7 +86,7 @@ struct INT_md_fix_yp {
 } __attribute__((packed));
 
 
-struct INT_tail_tp {
+struct INT_tail_t {
     u8 nextProto;
     u16 destPort;
     u8 originDSCP;
@@ -124,7 +124,9 @@ int collector(struct xdp_md *ctx) {
     void* data = (void*)(long)ctx->data;
     void* cursor = data;
 
+    //--------------------------------------------------------------------
     // parse outer: Ether->IP->UDP->TelemetryReport.
+    
     struct eth_tp *eth = cursor;
     cursor += sizeof(*eth);
     if (cursor > data_end)
@@ -135,10 +137,10 @@ int collector(struct xdp_md *ctx) {
     if (ntohs(eth->type) != ETHTYPE_IP)
         goto PASS;
     struct iphdr *ip = cursor;
-    cursor += sizeof(*ip);
+    cursor += sizeof(*ip); // TODO: Consider ip options (ip len)
     if (cursor > data_end)
         goto DROP;
-
+    
     bpf_trace_printk("src ip: %x, nextp: %d \n", ntohl(ip->saddr), ip->protocol);
 
     if (ip->protocol != IPPROTO_UDP)
@@ -152,18 +154,49 @@ int collector(struct xdp_md *ctx) {
 
     if (ntohs(udp->dest) != INT_DST_PORT)
         goto PASS;
-    struct telemetry_report_tp *tm_rp = cursor;
+    struct telemetry_report_t *tm_rp = cursor;
     cursor += sizeof(*tm_rp);
     if (cursor > data_end)
         goto DROP;
 
     bpf_trace_printk("ver: %d, f: %d, seq; %d \n", tm_rp->ver, tm_rp->f, ntohl(tm_rp->seqNumber));
 
+
+    //--------------------------------------------------------------------
     // parse Inner: Ether->IP->UDP->INT. we only consider Telemetry report with INT
 
+    struct eth_tp *in_eth = cursor;
+    cursor += sizeof(*in_eth);
+    if (cursor > data_end)
+        goto DROP;
 
+    bpf_trace_printk("inner eth type: %x, inner dst_mac: %llx \n", ntohs(in_eth->type), in_eth->dst);
 
+    struct iphdr *in_ip = cursor;
+    cursor += sizeof(*in_ip); // TODO: Consider ip options (ip len)
+    if (cursor > data_end)
+        goto DROP;
+    
+    bpf_trace_printk("inner src ip: %x, inner nextp: %d \n", ntohl(in_ip->saddr), in_ip->protocol);
 
+    struct udphdr *in_udp = cursor;
+    cursor += sizeof(*in_udp);
+    if (cursor > data_end)
+        goto DROP;
+
+    bpf_trace_printk("inner src port: %d, inner dst port: %d \n", ntohs(in_udp->source), ntohs(in_udp->dest));
+
+    struct INT_shim_t *INT_shim = cursor;
+    cursor += sizeof(*INT_shim);
+    if (cursor > data_end)
+        goto DROP;
+
+    struct INT_md_fix_t *INT_md_fix = cursor;
+    cursor += sizeof(*INT_md_fix);
+    if (cursor > data_end)
+        goto DROP;
+
+    bpf_trace_printk("inscnt: %d, ins: %x \n", INT_md_fix->insCnt, ntohs(INT_md_fix->ins));
 
 
     // // int ingress_if = skb->ingress_ifindex;
