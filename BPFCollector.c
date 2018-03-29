@@ -12,8 +12,9 @@
 
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
-#define MAX_IFACES 8
-#define MAX_TAPS 8
+
+#define MAX_INT_HOP 4
+
 #define TO_EGRESS 0
 #define TO_INGRESS 1
 #define BROADCAST_MAC 0xFFFFFFFFFFFF
@@ -86,11 +87,16 @@ struct INT_md_fix_t {
 } __attribute__((packed));
 
 
+struct INT_data_t {
+    u32 data;
+} __attribute__((packed));
+
 struct INT_tail_t {
     u8 nextProto;
     u16 destPort;
     u8 originDSCP;
 } __attribute__((packed));
+
 
 //--------------------------------------------------------------------
 
@@ -132,7 +138,7 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("eth type: %x, dst_mac: %llx \n", ntohs(eth->type), eth->dst);
+    // bpf_trace_printk("eth type: %x, dst_mac: %llx \n", ntohs(eth->type), eth->dst);
 
     if (ntohs(eth->type) != ETHTYPE_IP)
         goto PASS;
@@ -141,7 +147,7 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
     
-    bpf_trace_printk("src ip: %x, nextp: %d \n", ntohl(ip->saddr), ip->protocol);
+    // bpf_trace_printk("src ip: %x, nextp: %d \n", ntohl(ip->saddr), ip->protocol);
 
     if (ip->protocol != IPPROTO_UDP)
         goto PASS;
@@ -150,7 +156,8 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("src port: %d, dst port: %d \n", ntohs(udp->source), ntohs(udp->dest));
+    // bpf_trace_printk("src port: %d, dst port: %d \n",
+    //     ntohs(udp->source), ntohs(udp->dest));
 
     if (ntohs(udp->dest) != INT_DST_PORT)
         goto PASS;
@@ -159,7 +166,8 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("ver: %d, f: %d, seq; %d \n", tm_rp->ver, tm_rp->f, ntohl(tm_rp->seqNumber));
+    // bpf_trace_printk("ver: %d, f: %d, seq; %d \n",
+    //     tm_rp->ver, tm_rp->f, ntohl(tm_rp->seqNumber));
 
 
     //--------------------------------------------------------------------
@@ -170,21 +178,24 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("inner eth type: %x, inner dst_mac: %llx \n", ntohs(in_eth->type), in_eth->dst);
+    // bpf_trace_printk("inner eth type: %x, inner dst_mac: %llx \n",
+    //     ntohs(in_eth->type), in_eth->dst);
 
     struct iphdr *in_ip = cursor;
     cursor += sizeof(*in_ip); // TODO: Consider ip options (ip len)
     if (cursor > data_end)
         goto DROP;
     
-    bpf_trace_printk("inner src ip: %x, inner nextp: %d \n", ntohl(in_ip->saddr), in_ip->protocol);
+    // bpf_trace_printk("inner src ip: %x, inner nextp: %d \n",
+    //     ntohl(in_ip->saddr), in_ip->protocol);
 
     struct udphdr *in_udp = cursor;
     cursor += sizeof(*in_udp);
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("inner src port: %d, inner dst port: %d \n", ntohs(in_udp->source), ntohs(in_udp->dest));
+    // bpf_trace_printk("inner src port: %d, inner dst port: %d \n",
+    //     ntohs(in_udp->source), ntohs(in_udp->dest));
 
     struct INT_shim_t *INT_shim = cursor;
     cursor += sizeof(*INT_shim);
@@ -196,7 +207,321 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    bpf_trace_printk("inscnt: %d, ins: %x \n", INT_md_fix->insCnt, ntohs(INT_md_fix->ins));
+    // bpf_trace_printk("inscnt: %d, ins: %x, hop: %d \n",
+    //     INT_md_fix->insCnt, ntohs(INT_md_fix->ins), INT_md_fix->totalHopCnt);
+
+    //------------------------------------------------------------
+    // parse INT data
+
+    u8 num_INT_data = INT_md_fix->totalHopCnt * INT_md_fix->insCnt;
+    u8 num_INT_hop = INT_md_fix->totalHopCnt;
+    u16 INT_ins = ntohs(INT_md_fix->ins);
+
+    u32 dummy = 101010;
+    u32 *sw_ids[MAX_INT_HOP];
+    u32 *in_e_port_ids[MAX_INT_HOP];
+    u32 *hop_latencies[MAX_INT_HOP];
+    u32 *queue_occups[MAX_INT_HOP];
+    u32 *in_times[MAX_INT_HOP];
+    u32 *e_times[MAX_INT_HOP];
+    u32 *queue_congests[MAX_INT_HOP];
+    u32 *tx_utilizes[MAX_INT_HOP];
+    
+    // need to init pointers
+    #pragma unroll
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+        sw_ids[i] = &dummy;
+        in_e_port_ids[i] = &dummy;
+        hop_latencies[i] = &dummy;
+        queue_occups[i] = &dummy;
+        in_times[i] = &dummy;
+        e_times[i] = &dummy;
+        queue_congests[i] = &dummy;
+        tx_utilizes[i] = &dummy;
+    }
+    
+    u8 is_sw_ids = (INT_ins >> 15) & 0x01;
+    u8 is_in_e_port_ids = (INT_ins >> 14) & 0x01;
+    u8 is_hop_latencies = (INT_ins >> 13) & 0x01;
+    u8 is_queue_occups = (INT_ins >> 12) & 0x01;
+    u8 is_in_times = (INT_ins >> 11) & 0x01;
+    u8 is_e_times = (INT_ins >> 10) & 0x01;
+    u8 is_queue_congests = (INT_ins >> 9) & 0x01;
+    u8 is_tx_utilizes = (INT_ins >> 8) & 0x01;
+
+    // u8 is_sw_ids = (INT_ins >> 15) & 0x01;
+    // u8 is_in_e_port_ids = (INT_ins >> 15) & 0x01;
+    // u8 is_hop_latencies = (INT_ins >> 15) & 0x01;
+    // u8 is_queue_occups = (INT_ins >> 15) & 0x01;
+    // u8 is_in_times = (INT_ins >> 15) & 0x01;
+    // u8 is_e_times = (INT_ins >> 15) & 0x01;
+    // u8 is_queue_congests = (INT_ins >> 15) & 0x01;
+    // u8 is_tx_utilizes = (INT_ins >> 15) & 0x01;
+
+    bpf_trace_printk("is sw_id: %d, is hop_latencies: %d, is queue_occups: %d \n",
+        (INT_ins >> 15) & 0x1, (INT_ins >> 13) & 0x1, (INT_ins >> 12) & 0x1);
+
+    // should use un-roll loop INSIDE, but got compiler error
+    // use outside loop (1 loop) just to be able to fold the code
+    #pragma unroll
+    for (u8 t = 0; t < 1; t++) {
+        // -------------------------------------------------------
+        // ROUND 1 
+
+        if (is_sw_ids) {
+            sw_ids[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        if (is_in_e_port_ids) {
+            in_e_port_ids[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_hop_latencies) {
+            hop_latencies[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_occups) {
+            queue_occups[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_in_times) {
+            in_times[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_e_times) {
+            e_times[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_congests) {
+            queue_congests[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_tx_utilizes) {
+            tx_utilizes[0] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        num_INT_hop--;
+        if (num_INT_hop <= 0)
+            break;
+
+        // -------------------------------------------------------
+        // ROUND 2
+        if (is_sw_ids) {
+            sw_ids[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        if (is_in_e_port_ids) {
+            in_e_port_ids[1] = cursor; 
+            cursor += sizeof(dummy);
+            if (cursor > data_end) 
+                goto DROP;
+        }
+        
+        if (is_hop_latencies) {
+            hop_latencies[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_occups) {
+            queue_occups[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_in_times) {
+            in_times[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_e_times) {
+            e_times[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_congests) {
+            queue_congests[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_tx_utilizes) {
+            tx_utilizes[1] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        num_INT_hop--;
+        if (num_INT_hop <= 0)
+            break;
+        
+        // -------------------------------------------------------
+        // ROUND 3
+        if (is_sw_ids) {
+            sw_ids[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        if (is_in_e_port_ids) {
+            in_e_port_ids[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_hop_latencies) {
+            hop_latencies[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_occups) {
+            queue_occups[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_in_times) {
+            in_times[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_e_times) {
+            e_times[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_congests) {
+            queue_congests[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_tx_utilizes) {
+            tx_utilizes[2] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        num_INT_hop--;
+        if (num_INT_hop <= 0)
+            break;
+
+        // -------------------------------------------------------
+        // ROUND 4
+        if (is_sw_ids) {
+            sw_ids[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+
+        if (is_in_e_port_ids) {
+            in_e_port_ids[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_hop_latencies) {
+            hop_latencies[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_occups) {
+            queue_occups[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_in_times) {
+            in_times[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_e_times) {
+            e_times[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_queue_congests) {
+            queue_congests[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+        
+        if (is_tx_utilizes) {
+            tx_utilizes[3] = cursor;
+            cursor += sizeof(dummy);
+            if (cursor > data_end)
+                goto DROP;
+        }
+    }
+
+    // bpf_trace_printk("sw_ids: %d - %d - %d \n",
+    //     ntohl(*sw_ids[0]), ntohl(*sw_ids[1]), ntohl(*sw_ids[2]));
+
+    u32 tmp_32 = ntohl(*sw_ids[2]);
+    // parse INT tail
+    struct INT_tail_t *INT_tail = cursor;
+    cursor += sizeof(*INT_tail);
+    if (cursor > data_end)
+        goto DROP;
+    if (tmp_32 > 0)
+        bpf_trace_printk("origin DSCP: %d\n", INT_tail->originDSCP);
 
 
     // // int ingress_if = skb->ingress_ifindex;

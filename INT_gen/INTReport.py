@@ -39,8 +39,7 @@ class INT(Packet):
         XShortField("ins", None),
         XShortField("res", 0),
 
-        # FieldListField("INTMetadata", [], IntField, count_from=lambda p:p[INT].totalHopCnt*p[INT].insCnt),
-        FieldListField("INTMetadata", [], XByteField("", None), count_from=lambda p:p.totalHopCnt*p.insCnt),
+        FieldListField("INTMetadata", [], XIntField("", None), count_from=lambda p:p.totalHopCnt*p.insCnt),
 
         XByteField("proto", None),
         XShortField("port", None),
@@ -55,7 +54,8 @@ if __name__ == "__main__":
         Ether()/ \
         IP(src="10.0.0.1", dst="10.0.0.2")/ \
         UDP(sport=5000, dport=5000)/ \
-        INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22])
+        INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22],
+            originDSCP=14)
 
     # p = INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22])
     

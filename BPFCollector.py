@@ -18,11 +18,13 @@ iface = "veth1"
 BPFCollector = BPF(src_file="BPFCollector.c", debug=0)
 
 fn_collector = BPFCollector.load_func("collector", BPF.XDP)
-
-
-# # attach XDP function
 BPFCollector.attach_xdp(iface, fn_collector, 0)
 
+# fn_collector = BPFCollector.load_func("collector", BPF.SCHED_CLS)
+# idx0 = ipr.link_lookup(ifname=iface)[0]
+# ipr.tc("add", "clsact", idx0)
+# ipr.tc("add-filter", "bpf", idx0, ":1", fd=fn_collector.fd, name=fn_collector.name,
+#        parent="ffff:fff3", classid=1, direct_action=True)
 
 
 # idx1 = ipr.link_lookup(ifname="vnet1")[0]
@@ -44,6 +46,7 @@ except KeyboardInterrupt:
 
 finally:
     BPFCollector.remove_xdp(iface, 0)
+    # ipr.tc("del", "clsact", idx0)
     # print "tb_ifaces: ", tb_ifaces.items()
     print("Done")
 
