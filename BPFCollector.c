@@ -13,7 +13,7 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 4
+#define MAX_INT_HOP 6
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -207,321 +207,109 @@ int collector(struct xdp_md *ctx) {
     if (cursor > data_end)
         goto DROP;
 
-    // bpf_trace_printk("inscnt: %d, ins: %x, hop: %d \n",
-    //     INT_md_fix->insCnt, ntohs(INT_md_fix->ins), INT_md_fix->totalHopCnt);
+    bpf_trace_printk("inscnt: %d, ins: %x, hop: %d \n",
+        INT_md_fix->insCnt, ntohs(INT_md_fix->ins), INT_md_fix->totalHopCnt);
 
     //------------------------------------------------------------
     // parse INT data
 
     u8 num_INT_data = INT_md_fix->totalHopCnt * INT_md_fix->insCnt;
     u8 num_INT_hop = INT_md_fix->totalHopCnt;
+
+    struct INT_data_t *INT_data;
+
+	u32 d0[MAX_INT_HOP] = {0};
+	u32 d1[MAX_INT_HOP] = {0};
+	u32 d2[MAX_INT_HOP] = {0};
+	u32 d3[MAX_INT_HOP] = {0};
+	u32 d4[MAX_INT_HOP] = {0};
+	u32 d5[MAX_INT_HOP] = {0};
+	u32 d6[MAX_INT_HOP] = {0};
+	u32 d7[MAX_INT_HOP] = {0};
+
     u16 INT_ins = ntohs(INT_md_fix->ins);
-
-    u32 dummy = 101010;
-    u32 *sw_ids[MAX_INT_HOP];
-    u32 *in_e_port_ids[MAX_INT_HOP];
-    u32 *hop_latencies[MAX_INT_HOP];
-    u32 *queue_occups[MAX_INT_HOP];
-    u32 *in_times[MAX_INT_HOP];
-    u32 *e_times[MAX_INT_HOP];
-    u32 *queue_congests[MAX_INT_HOP];
-    u32 *tx_utilizes[MAX_INT_HOP];
-    
-    // need to init pointers
-    #pragma unroll
-    for (u8 i = 0; i < MAX_INT_HOP; i++) {
-        sw_ids[i] = &dummy;
-        in_e_port_ids[i] = &dummy;
-        hop_latencies[i] = &dummy;
-        queue_occups[i] = &dummy;
-        in_times[i] = &dummy;
-        e_times[i] = &dummy;
-        queue_congests[i] = &dummy;
-        tx_utilizes[i] = &dummy;
-    }
-    
-    u8 is_sw_ids = (INT_ins >> 15) & 0x01;
-    u8 is_in_e_port_ids = (INT_ins >> 14) & 0x01;
-    u8 is_hop_latencies = (INT_ins >> 13) & 0x01;
-    u8 is_queue_occups = (INT_ins >> 12) & 0x01;
-    u8 is_in_times = (INT_ins >> 11) & 0x01;
-    u8 is_e_times = (INT_ins >> 10) & 0x01;
+    u8 is_sw_ids 		 = (INT_ins >> 15) & 0x01;
+    u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x01;
+    u8 is_hop_latencies  = (INT_ins >> 13) & 0x01;
+    u8 is_queue_occups 	 = (INT_ins >> 12) & 0x01;
+    u8 is_in_times 		 = (INT_ins >> 11) & 0x01;
+    u8 is_e_times 		 = (INT_ins >> 10) & 0x01;
     u8 is_queue_congests = (INT_ins >> 9) & 0x01;
-    u8 is_tx_utilizes = (INT_ins >> 8) & 0x01;
-
-    // u8 is_sw_ids = (INT_ins >> 15) & 0x01;
-    // u8 is_in_e_port_ids = (INT_ins >> 15) & 0x01;
-    // u8 is_hop_latencies = (INT_ins >> 15) & 0x01;
-    // u8 is_queue_occups = (INT_ins >> 15) & 0x01;
-    // u8 is_in_times = (INT_ins >> 15) & 0x01;
-    // u8 is_e_times = (INT_ins >> 15) & 0x01;
-    // u8 is_queue_congests = (INT_ins >> 15) & 0x01;
-    // u8 is_tx_utilizes = (INT_ins >> 15) & 0x01;
+    u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x01;
 
     bpf_trace_printk("is sw_id: %d, is hop_latencies: %d, is queue_occups: %d \n",
-        (INT_ins >> 15) & 0x1, (INT_ins >> 13) & 0x1, (INT_ins >> 12) & 0x1);
+        is_sw_ids, is_hop_latencies, is_queue_occups);
 
-    // should use un-roll loop INSIDE, but got compiler error
-    // use outside loop (1 loop) just to be able to fold the code
+
     #pragma unroll
-    for (u8 t = 0; t < 1; t++) {
-        // -------------------------------------------------------
-        // ROUND 1 
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
         if (is_sw_ids) {
-            sw_ids[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d0[i] = ntohl(INT_data->data);
         }
-
         if (is_in_e_port_ids) {
-            in_e_port_ids[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d1[i] = ntohl(INT_data->data);
         }
-        
         if (is_hop_latencies) {
-            hop_latencies[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d2[i] = ntohl(INT_data->data);
         }
-        
         if (is_queue_occups) {
-            queue_occups[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d3[i] = ntohl(INT_data->data);
         }
-        
         if (is_in_times) {
-            in_times[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d4[i] = ntohl(INT_data->data);
         }
-        
         if (is_e_times) {
-            e_times[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d5[i] = ntohl(INT_data->data);
         }
-        
         if (is_queue_congests) {
-            queue_congests[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d6[i] = ntohl(INT_data->data);
         }
-        
         if (is_tx_utilizes) {
-            tx_utilizes[0] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
+            INT_data = cursor;
+            cursor += sizeof(*INT_data);
+            if (cursor > data_end) goto DROP;
+            d7[i] = ntohl(INT_data->data);
         }
 
-        num_INT_hop--;
-        if (num_INT_hop <= 0)
-            break;
-
-        // -------------------------------------------------------
-        // ROUND 2
-        if (is_sw_ids) {
-            sw_ids[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-
-        if (is_in_e_port_ids) {
-            in_e_port_ids[1] = cursor; 
-            cursor += sizeof(dummy);
-            if (cursor > data_end) 
-                goto DROP;
-        }
-        
-        if (is_hop_latencies) {
-            hop_latencies[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_occups) {
-            queue_occups[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_in_times) {
-            in_times[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_e_times) {
-            e_times[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_congests) {
-            queue_congests[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_tx_utilizes) {
-            tx_utilizes[1] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-
-        num_INT_hop--;
-        if (num_INT_hop <= 0)
-            break;
-        
-        // -------------------------------------------------------
-        // ROUND 3
-        if (is_sw_ids) {
-            sw_ids[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-
-        if (is_in_e_port_ids) {
-            in_e_port_ids[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_hop_latencies) {
-            hop_latencies[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_occups) {
-            queue_occups[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_in_times) {
-            in_times[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_e_times) {
-            e_times[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_congests) {
-            queue_congests[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_tx_utilizes) {
-            tx_utilizes[2] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-
-        num_INT_hop--;
-        if (num_INT_hop <= 0)
-            break;
-
-        // -------------------------------------------------------
-        // ROUND 4
-        if (is_sw_ids) {
-            sw_ids[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-
-        if (is_in_e_port_ids) {
-            in_e_port_ids[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_hop_latencies) {
-            hop_latencies[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_occups) {
-            queue_occups[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_in_times) {
-            in_times[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_e_times) {
-            e_times[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_queue_congests) {
-            queue_congests[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
-        
-        if (is_tx_utilizes) {
-            tx_utilizes[3] = cursor;
-            cursor += sizeof(dummy);
-            if (cursor > data_end)
-                goto DROP;
-        }
+        // no need for the final round
+        if (i < MAX_INT_HOP - 1) {  	
+        	num_INT_hop--;
+	        if (num_INT_hop <= 0)
+	            break;
+	    }
     }
 
-    // bpf_trace_printk("sw_ids: %d - %d - %d \n",
-    //     ntohl(*sw_ids[0]), ntohl(*sw_ids[1]), ntohl(*sw_ids[2]));
+    bpf_trace_printk("d00: %d, d20: %d, d75: %d \n", d0[0], d2[0], d7[5]);
+    bpf_trace_printk("d20: %x, d21: %x, d22: %x \n", d2[0], d2[1], d2[2]);
 
-    u32 tmp_32 = ntohl(*sw_ids[2]);
     // parse INT tail
     struct INT_tail_t *INT_tail = cursor;
     cursor += sizeof(*INT_tail);
     if (cursor > data_end)
         goto DROP;
-    if (tmp_32 > 0)
-        bpf_trace_printk("origin DSCP: %d\n", INT_tail->originDSCP);
+    bpf_trace_printk("origin DSCP: %d\n", INT_tail->originDSCP);
 
 
     // // int ingress_if = skb->ingress_ifindex;
