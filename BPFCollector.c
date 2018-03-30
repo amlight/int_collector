@@ -19,6 +19,9 @@
 #define TO_INGRESS 1
 #define BROADCAST_MAC 0xFFFFFFFFFFFF
 
+#define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
+  ({ _target = _cursor; _cursor += _len; if(_cursor > _data_end) return XDP_DROP; })
+
 //--------------------------------------------------------------------
 // Protocols
 struct eth_tp {
@@ -133,38 +136,30 @@ int collector(struct xdp_md *ctx) {
     //--------------------------------------------------------------------
     // parse outer: Ether->IP->UDP->TelemetryReport.
     
-    struct eth_tp *eth = cursor;
-    cursor += sizeof(*eth);
-    if (cursor > data_end)
-        goto DROP;
+    struct eth_tp *eth;
+    CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
 
     // bpf_trace_printk("eth type: %x, dst_mac: %llx \n", ntohs(eth->type), eth->dst);
 
     if (ntohs(eth->type) != ETHTYPE_IP)
         goto PASS;
-    struct iphdr *ip = cursor;
-    cursor += sizeof(*ip); // TODO: Consider ip options (ip len)
-    if (cursor > data_end)
-        goto DROP;
+    struct iphdr *ip;
+    CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
     
     // bpf_trace_printk("src ip: %x, nextp: %d \n", ntohl(ip->saddr), ip->protocol);
 
     if (ip->protocol != IPPROTO_UDP)
         goto PASS;
-    struct udphdr *udp = cursor;
-    cursor += sizeof(*udp);
-    if (cursor > data_end)
-        goto DROP;
+    struct udphdr *udp;
+    CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
 
     // bpf_trace_printk("src port: %d, dst port: %d \n",
     //     ntohs(udp->source), ntohs(udp->dest));
 
     if (ntohs(udp->dest) != INT_DST_PORT)
         goto PASS;
-    struct telemetry_report_t *tm_rp = cursor;
-    cursor += sizeof(*tm_rp);
-    if (cursor > data_end)
-        goto DROP;
+    struct telemetry_report_t *tm_rp;
+    CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
     // bpf_trace_printk("ver: %d, f: %d, seq; %d \n",
     //     tm_rp->ver, tm_rp->f, ntohl(tm_rp->seqNumber));
@@ -173,39 +168,29 @@ int collector(struct xdp_md *ctx) {
     //--------------------------------------------------------------------
     // parse Inner: Ether->IP->UDP->INT. we only consider Telemetry report with INT
 
-    struct eth_tp *in_eth = cursor;
-    cursor += sizeof(*in_eth);
-    if (cursor > data_end)
-        goto DROP;
+    struct eth_tp *in_eth;
+    CURSOR_ADVANCE(in_eth, cursor, sizeof(*in_eth), data_end);
 
     // bpf_trace_printk("inner eth type: %x, inner dst_mac: %llx \n",
     //     ntohs(in_eth->type), in_eth->dst);
 
-    struct iphdr *in_ip = cursor;
-    cursor += sizeof(*in_ip); // TODO: Consider ip options (ip len)
-    if (cursor > data_end)
-        goto DROP;
+    struct iphdr *in_ip;
+    CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
     
     // bpf_trace_printk("inner src ip: %x, inner nextp: %d \n",
     //     ntohl(in_ip->saddr), in_ip->protocol);
 
-    struct udphdr *in_udp = cursor;
-    cursor += sizeof(*in_udp);
-    if (cursor > data_end)
-        goto DROP;
+    struct udphdr *in_udp;
+    CURSOR_ADVANCE(in_udp, cursor, sizeof(*in_udp), data_end);
 
     // bpf_trace_printk("inner src port: %d, inner dst port: %d \n",
     //     ntohs(in_udp->source), ntohs(in_udp->dest));
 
-    struct INT_shim_t *INT_shim = cursor;
-    cursor += sizeof(*INT_shim);
-    if (cursor > data_end)
-        goto DROP;
+    struct INT_shim_t *INT_shim;
+    CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
 
-    struct INT_md_fix_t *INT_md_fix = cursor;
-    cursor += sizeof(*INT_md_fix);
-    if (cursor > data_end)
-        goto DROP;
+    struct INT_md_fix_t *INT_md_fix;
+    CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
 
     bpf_trace_printk("inscnt: %d, ins: %x, hop: %d \n",
         INT_md_fix->insCnt, ntohs(INT_md_fix->ins), INT_md_fix->totalHopCnt);
@@ -245,51 +230,35 @@ int collector(struct xdp_md *ctx) {
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
         if (is_sw_ids) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d0[i] = ntohl(INT_data->data);
         }
         if (is_in_e_port_ids) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d1[i] = ntohl(INT_data->data);
         }
         if (is_hop_latencies) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d2[i] = ntohl(INT_data->data);
         }
         if (is_queue_occups) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d3[i] = ntohl(INT_data->data);
         }
         if (is_in_times) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d4[i] = ntohl(INT_data->data);
         }
         if (is_e_times) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d5[i] = ntohl(INT_data->data);
         }
         if (is_queue_congests) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d6[i] = ntohl(INT_data->data);
         }
         if (is_tx_utilizes) {
-            INT_data = cursor;
-            cursor += sizeof(*INT_data);
-            if (cursor > data_end) goto DROP;
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             d7[i] = ntohl(INT_data->data);
         }
 
@@ -305,10 +274,8 @@ int collector(struct xdp_md *ctx) {
     bpf_trace_printk("d20: %x, d21: %x, d22: %x \n", d2[0], d2[1], d2[2]);
 
     // parse INT tail
-    struct INT_tail_t *INT_tail = cursor;
-    cursor += sizeof(*INT_tail);
-    if (cursor > data_end)
-        goto DROP;
+    struct INT_tail_t *INT_tail;
+    CURSOR_ADVANCE(INT_tail, cursor, sizeof(*INT_tail), data_end);
     bpf_trace_printk("origin DSCP: %d\n", INT_tail->originDSCP);
 
 
