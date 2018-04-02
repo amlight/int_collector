@@ -1,5 +1,6 @@
 #!/usr/bin/python
 from scapy.all import *
+import time
 
 class TelemetryReport(Packet):
 
@@ -54,7 +55,10 @@ if __name__ == "__main__":
         Ether()/ \
         IP(src="10.0.0.1", dst="10.0.0.2")/ \
         UDP(sport=5000, dport=5000)/ \
-        INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22],
+        INT(insCnt=8, totalHopCnt=3, ins=(1<<7 | 1 << 6 | 1<<5 | 1<<4 | 1 << 3 | 1<<2 | 1<<1 | 1)<<8,
+            INTMetadata=[1, 2<<16| 3, 4, 5<<16| 6, 7, 8, 9<<16| 10, 11,
+                        11, 21<<16| 31, 41, 51<<16| 61, 71, 81, 91<<16| 101, 111,
+                        12, 22<<16| 32, 42, 52<<16| 62, 72, 82, 92<<16| 102, 112],
             originDSCP=14)
 
     # p = INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22])
@@ -65,5 +69,8 @@ if __name__ == "__main__":
     #     TelemetryReport(ver=1, seqNumber=1234)
 
     sendp(p, iface="veth0")
+    time.sleep(0.5)
+
+    # sendp(p, iface="veth0")
 
     # vars(p)

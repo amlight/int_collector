@@ -9,10 +9,53 @@ import time
 # import os
 # import json
 # import ipaddress
+import ctypes as ct
+
+def process_event(ctx, data, size):
+
+	MAX_INT_HOP = 4
+	class Event(ct.Structure):
+		_fields_ =  [("src_ip", ct.c_uint32),
+					 ("dst_ip", ct.c_uint32),
+					 ("src_port", ct.c_ushort),
+					 ("dst_port", ct.c_ushort),
+					 ("ip_proto", ct.c_ushort),
+
+					 ("is_path", ct.c_ubyte),
+					 ("is_hop_latency", ct.c_ubyte),
+					 ("is_queue_occup", ct.c_ubyte),
+					 ("is_queue_congest", ct.c_ubyte),
+					 ("is_tx_utilize", ct.c_ubyte),
+
+					 ("sw_ids", ct.c_uint32 * MAX_INT_HOP),
+					 ("in_e_port_ids", ct.c_uint32 * MAX_INT_HOP),
+					 ("hop_latencies", ct.c_uint32 * MAX_INT_HOP),
+					 ("queue_occups", ct.c_uint32 * MAX_INT_HOP),
+					 ("ingr_times", ct.c_uint32 * MAX_INT_HOP),
+					 ("egr_times", ct.c_uint32 * MAX_INT_HOP),
+					 ("queue_congests", ct.c_uint32 * MAX_INT_HOP),
+					 ("tx_utilizes", ct.c_uint32 * MAX_INT_HOP)
+					 ]
+
+	event = ct.cast(data, ct.POINTER(Event)).contents
+	
+	print "-------------------------------------------------------"
+	for field_name, field_type in event._fields_:
+		field_arr = getattr(event, field_name)
+		
+		if field_name in ["sw_ids","in_e_port_ids","hop_latencies","queue_occups",
+						  "ingr_times","egr_times","queue_congests","tx_utilizes"]:
+			_len = len(field_arr)
+			s = ""
+			for e in field_arr:
+				s = s+str(e)+", " 
+			print field_name+": ", s
+		else:
+			print field_name+": ", field_arr
+
 
 
 # ipr = IPRoute()
-# iface = "enp0s3" 
 iface = "veth1" 
 
 BPFCollector = BPF(src_file="BPFCollector.c", debug=0)
@@ -27,19 +70,13 @@ BPFCollector.attach_xdp(iface, fn_collector, 0)
 #        parent="ffff:fff3", classid=1, direct_action=True)
 
 
-# idx1 = ipr.link_lookup(ifname="vnet1")[0]
 
-# test tb_tap
-# tb_tap = bpf_simple_sw.get_table("tb_tap")
-# key = tb_tap.Key(0)
-# leaf = tb_tap.Leaf(0, 0,
-#                    int(ipaddress.IPv4Address(u'10.0.0.2')),
-#                    int('0xffffffff', 16),
-#                    0, 0, 0, idx2, 1)
-# tb_tap[key] = leaf
+
 try:
     print "eBPF progs Loaded"
-    time.sleep(600)
+    BPFCollector["events"].open_perf_buffer(process_event)
+    while 1:
+    	BPFCollector.kprobe_poll()
 
 except KeyboardInterrupt:
     pass

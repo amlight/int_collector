@@ -13,13 +13,18 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 6
+#define MAX_INT_HOP 4
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
 #define BROADCAST_MAC 0xFFFFFFFFFFFF
 #define NULL32 0xFFFFFFFF
 #define NULL16 0xFFFF
+
+#define HOP_LATENCY 50
+#define QUEUE_OCCUP 50
+#define QUEUE_CONGEST 50
+#define TX_UTILIZE 50
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
 	({  _target = _cursor; _cursor += _len; \
@@ -149,7 +154,7 @@ struct egr_info_t {
 
 struct queue_id_t {
 	u32 sw_id;
-	u16 queue_id;
+	u16 q_id;
 };
 
 struct queue_info_t {
@@ -157,7 +162,9 @@ struct queue_info_t {
 	u8 occup_ex;
 
 	u16 congest;
-	u8 congest_ex;      
+	u8 congest_ex;
+
+    u32 q_time;
 };
 
 
@@ -171,27 +178,30 @@ struct event_t {
 	u16 dst_port;
 	u16 ip_proto;
 
-	u32 path[MAX_INT_HOP];
-
-	// switch
-	u32 sw_id[MAX_INT_HOP];
-	u16 ingr_id[MAX_INT_HOP];
-	u16 egr_id[MAX_INT_HOP];
-	u16 queue_id[MAX_INT_HOP];
-
-
 	u8 is_path;
 	u8 is_hop_latency;
-	u8 is_queue_occup;
+    u8 is_queue_occup;
+	u8 is_queue_congest;
 	u8 is_tx_utilize;
+
+    u32 sw_ids[MAX_INT_HOP];
+    u32 in_e_port_ids[MAX_INT_HOP];
+    u32 hop_latencies[MAX_INT_HOP];
+    u32 queue_occups[MAX_INT_HOP];
+    u32 ingr_times[MAX_INT_HOP];
+    u32 egr_times[MAX_INT_HOP];
+    u32 queue_congests[MAX_INT_HOP];
+    u32 tx_utilizes[MAX_INT_HOP];
 };
 
+BPF_PERF_OUTPUT(events);
+
 BPF_TABLE("hash", struct flow_id_t, struct flow_path_t, tb_path, 1024);
-BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
+// nothing to store in tb_ingr yet
+// BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
 BPF_TABLE("hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
 BPF_TABLE("hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
 
-BPF_PERF_OUTPUT(events);
 
 //--------------------------------------------------------------------
 
@@ -203,51 +213,43 @@ int collector(struct xdp_md *ctx) {
     void* data = (void*)(long)ctx->data;
     void* cursor = data;
 
-    // parse outer: Ether->IP->UDP->TelemetryReport.
-    
+
+    /*
+        Parse outer: Ether->IP->UDP->TelemetryReport.
+    */  
+
     struct eth_tp *eth;
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
-    // bpf_trace_printk("eth type: %x, dst_mac: %llx \n", ntohs(eth->type), eth->dst);
 
-    if (ntohs(eth->type) != ETHTYPE_IP)
+    if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
         return XDP_PASS;
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
-    // bpf_trace_printk("src ip: %x, nextp: %d \n", ntohl(ip->saddr), ip->protocol);
 
-    if (ip->protocol != IPPROTO_UDP)
+    if (unlikely(ip->protocol != IPPROTO_UDP))
         return XDP_PASS;
     struct udphdr *udp;
     CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
-    // bpf_trace_printk("src port: %d, dst port: %d \n",
-    //     ntohs(udp->source), ntohs(udp->dest));
 
-    if (ntohs(udp->dest) != INT_DST_PORT)
+    if (unlikely(ntohs(udp->dest) != INT_DST_PORT))
         return XDP_PASS;
     struct telemetry_report_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
-    // bpf_trace_printk("ver: %d, f: %d, seq; %d \n",
-    //     tm_rp->ver, tm_rp->f, ntohl(tm_rp->seqNumber));
+
 
 	/*
-	    parse Inner: Ether->IP->UDP->INT. 
-	    we only consider Telemetry report with INT
+        Parse Inner: Ether->IP->UDP->INT. 
+        we only consider Telemetry report with INT
 	*/
 
     struct eth_tp *in_eth;
     CURSOR_ADVANCE(in_eth, cursor, sizeof(*in_eth), data_end);
-    // bpf_trace_printk("inner eth type: %x, inner dst_mac: %llx \n",
-    //     ntohs(in_eth->type), in_eth->dst);
 
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);    
-    // bpf_trace_printk("inner src ip: %x, inner nextp: %d \n",
-    //     ntohl(in_ip->saddr), in_ip->protocol);
 
     struct udphdr *in_udp;
     CURSOR_ADVANCE(in_udp, cursor, sizeof(*in_udp), data_end);
-    // bpf_trace_printk("inner src port: %d, inner dst port: %d \n",
-    //     ntohs(in_udp->source), ntohs(in_udp->dest));
 
     struct INT_shim_t *INT_shim;
     CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
@@ -255,8 +257,6 @@ int collector(struct xdp_md *ctx) {
     struct INT_md_fix_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
 
-    // bpf_trace_printk("inscnt: %d, ins: %x, hop: %d \n",
-    //     INT_md_fix->insCnt, ntohs(INT_md_fix->ins), INT_md_fix->totalHopCnt);
 
     /*
     	Parse INT data
@@ -266,15 +266,31 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_data_t *INT_data;
 
-    // FIXME: harcoded
-	u32 sw_ids[MAX_INT_HOP] 		= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 in_e_port_ids[MAX_INT_HOP] 	= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 hop_latencies[MAX_INT_HOP] 	= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 queue_occups[MAX_INT_HOP] 	= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 ingr_times[MAX_INT_HOP] 	= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 egr_times[MAX_INT_HOP] 		= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 queue_congests[MAX_INT_HOP] = {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
-	u32 tx_utilizes[MAX_INT_HOP] 	= {NULL32, NULL32, NULL32, NULL32, NULL32, NULL32};
+    struct event_t event = {};
+    event.src_ip = ntohl(in_ip->saddr);
+    event.dst_ip = ntohl(in_ip->daddr);
+    event.src_port = ntohs(in_udp->source);
+    event.dst_port = ntohs(in_udp->dest);
+    event.ip_proto = in_ip->protocol;
+
+    #pragma unroll
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+        event.sw_ids[i] = 0;
+        event.in_e_port_ids[i] = 0;
+        event.hop_latencies[i] = 0;
+        event.queue_occups[i] = 0;
+        event.ingr_times[i] = 0;
+        event.egr_times[i] = 0;
+        event.queue_congests[i] = 0;
+        event.tx_utilizes[i] = 0;
+    }
+
+    event.is_path = 0;
+    event.is_hop_latency = 0;
+    event.is_queue_congest = 0;
+    event.is_queue_occup = 0;
+    event.is_tx_utilize = 0;
+
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
     u8 is_sw_ids 		 = (INT_ins >> 15) & 0x01;
@@ -286,44 +302,40 @@ int collector(struct xdp_md *ctx) {
     u8 is_queue_congests = (INT_ins >> 9) & 0x01;
     u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x01;
 
-    // bpf_trace_printk("is sw_id: %d, is hop_latencies: %d, is queue_occups: %d \n",
-    //     is_sw_ids, is_hop_latencies, is_queue_occups);
-
-
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
-        if (is_sw_ids) {
+        if (likely(is_sw_ids)) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            sw_ids[i] = ntohl(INT_data->data);
+            event.sw_ids[i] = ntohl(INT_data->data);
         }
         if (is_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            in_e_port_ids[i] = ntohl(INT_data->data);
+            event.in_e_port_ids[i] = ntohl(INT_data->data);
         }
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            hop_latencies[i] = ntohl(INT_data->data);
+            event.hop_latencies[i] = ntohl(INT_data->data);
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            queue_occups[i] = ntohl(INT_data->data);
+            event.queue_occups[i] = ntohl(INT_data->data);
         }
         if (is_ingr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            ingr_times[i] = ntohl(INT_data->data);
+            event.ingr_times[i] = ntohl(INT_data->data);
         }
         if (is_egr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            egr_times[i] = ntohl(INT_data->data);
+            event.egr_times[i] = ntohl(INT_data->data);
         }
         if (is_queue_congests) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            queue_congests[i] = ntohl(INT_data->data);
+            event.queue_congests[i] = ntohl(INT_data->data);
         }
         if (is_tx_utilizes) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            tx_utilizes[i] = ntohl(INT_data->data);
+            event.tx_utilizes[i] = ntohl(INT_data->data);
         }
 
         // no need for the final round
@@ -334,9 +346,6 @@ int collector(struct xdp_md *ctx) {
 	    }
     }
 
-    // bpf_trace_printk("sw_ids: %d - %d - %d \n", sw_ids[0], sw_ids[1], sw_ids[2]);
-    // bpf_trace_printk("hop_latencies: %x - %x - %x \n",
-    // 	hop_latencies[0], hop_latencies[1], hop_latencies[2]);
 
     // parse INT tail
     struct INT_tail_t *INT_tail;
@@ -345,176 +354,142 @@ int collector(struct xdp_md *ctx) {
 
 
     /*
-     	Store data and event detection. New event when: 
-    	- New data
-    	- Path change
-    	- Exceed threshold (hop latency, queue occupancy, queue congestion)
+        Store data and event detection. New event when: 
+        - New data
+        - Path change
+        - Exceed threshold (hop latency, queue occupancy, queue congestion)
     */
 
     // Assume that sw_id is alway presented.
-    if (!is_sw_ids) return XDP_PASS;
+    if (unlikely(!is_sw_ids)) return XDP_PASS;
 
-    struct event_t event = {};
+    /*
+        Path store and change-detection
+    */
 
-    event.src_ip = ntohl(in_ip->saddr);
-	event.dst_ip = ntohl(in_ip->daddr);
-	event.src_port = ntohs(in_udp->source);
-	event.dst_port = ntohs(in_udp->dest);
-	event.ip_proto = in_ip->protocol;
+    struct flow_id_t flow_id = {};
+    flow_id.src_ip = event.src_ip;
+    flow_id.dst_ip = event.dst_ip;
+    flow_id.src_port = event.src_port;
+    flow_id.dst_port = event.dst_port;
+    flow_id.ip_proto = event.ip_proto;
 
-	/*
-    	Path store and change-detection
-	*/
-
-	struct flow_id_t flow_id = {};
-	flow_id.src_ip = event.src_ip;
-	flow_id.dst_ip = event.dst_ip;
-	flow_id.src_port = event.src_port;
-	flow_id.dst_port = event.dst_port;
-	flow_id.ip_proto = event.ip_proto;
-
-	// FIXME: harcoded
-	struct flow_path_t flow_path = {};
-	#pragma unroll
+    struct flow_path_t flow_path = {};
+    #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-    	flow_path.path[i] = sw_ids[i];
+        flow_path.path[i] = event.sw_ids[i];
     }
 
-    // bpf_trace_printk("path: %x - %x \n", 
-    // 	flow_path.path[0], flow_path.path[5]);
-
-	struct flow_path_t *old_flow_path_p = tb_path.lookup(&flow_id);
-	if (!old_flow_path_p) { // new flows
-		
-		event.is_path = 1;
-
-	} else { // compare with old flow
-		#pragma unroll
-	    for (u8 i = 0; i < MAX_INT_HOP; i++) {
-	    	if (sw_ids[i] == old_flow_path_p->path[i]) {
-	    		event.is_path = 1;
-	    		break;
-	    	}
-	    }
-	}
-
-	if (event.is_path) {
-		tb_path.update(&flow_id, &flow_path);
-			#pragma unroll
-	    for (u8 i = 0; i < MAX_INT_HOP; i++) {
-	    	event.path[i] = sw_ids[i];
-	    }
-	}
-
-
-
-
-	if (event.is_path | event.is_hop_latency | event.is_queue_occup | event.is_tx_utilize)
-		events.perf_submit(ctx, &event, sizeof(event));
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // struct flow_id_t flow_id = {};
-    // flow_id.src_ip = ntohl(in_ip->saddr);
-    // flow_id.dst_ip = ntohl(in_ip->daddr);
-    // flow_id.src_port = ntohs(in_udp->source);
-    // flow_id.dst_port = ntohs(in_udp->dest);
-
-
-
-
-    // // int ingress_if = skb->ingress_ifindex;
-
-    // //---------------------------------------------------
-    // // // MONITORING
-
-    // // // parse IP
-    // // if (eth->type != 0x0800) {
-    // //     struct ip_t *ip = data + sizeof(*eth);
-    // //     if (ip + 1 > data_end) {
-    // //         return XDP_DROP;
-    // //     }
-    // // } else {
-    // //     return XDP_DROP;
-    // // }
-
-    // // struct five_tuple_t five_tuple = {};
-    // // five_tuple.protocol = ip->nextp;
-    // // five_tuple.src_ip = ip->src;
-    // // five_tuple.dst_ip = ip->dst;
-    
-    // // struct statistic_t init_stat = {};
-    // // init_stat.pkt_cnt = 0;
-    // // init_stat.len_cnt = 0;
-
-    // // if (ip->nextp == IPPROTO_TCP) {
-    // //     struct tcp_t *tcp;
-    // //     tcp = data + sizeof(*ip);
+    struct flow_path_t *old_flow_path_p = tb_path.lookup(&flow_id);
+    if (!old_flow_path_p) {
         
-    // //     if (tcp + 1 > data_end) {
-    // //         return XDP_DROP;
-    // //     }
-        
-    // //     five_tuple.src_port = tcp->src_port;
-    // //     five_tuple.dst_port = tcp->dst_port;
+        event.is_path = 1;
 
-    // // } else if (ip->nextp == IPPROTO_UDP) {
-    // //     struct udp_t *udp;
-    // //     udp = data + sizeof(*ip);
+    } else {
+        #pragma unroll
+        for (u8 i = 0; i < MAX_INT_HOP; i++) {
+            if (event.sw_ids[i] != old_flow_path_p->path[i]) {
+                event.is_path = 1;
+                break;
+            }
+        }
+    }
 
-    // //     if (udp + 1 > data_end) {
-    // //         return XDP_DROP;
-    // //     }
-        
-    // //     five_tuple.src_port = udp->sport;
-    // //     five_tuple.dst_port = udp->dport;
+    if (event.is_path) 
+        tb_path.update(&flow_id, &flow_path);
 
-    // // } else {
-    // //     five_tuple.src_port = 0;
-    // //     five_tuple.dst_port = 0;
-    // // }
 
-    // // // write statistic to table
-    // // struct statistic_t *cur_stat = tb_statistic.lookup_or_init(&five_tuple, &init_stat);
+    /*
+        Egress info
+    */
+
+    struct egr_info_t *egr_info_p;
+    struct egr_id_t egr_id = {};
+    struct egr_info_t egr_info = {};
+
+    num_INT_hop = INT_md_fix->totalHopCnt;
+    #pragma unroll
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+        if (is_in_e_port_ids && (is_hop_latencies | is_tx_utilizes)) {
+            if (num_INT_hop <= 0)
+                break;
+                      
+            egr_id.sw_id  = event.sw_ids[i];
+            egr_id.e_p_id = event.in_e_port_ids[i] & 0xff;
+          
+            egr_info.hop_latency = event.hop_latencies[i];
+            egr_info.egr_time    = event.egr_times[i];
+            egr_info.tx_utilize  = event.tx_utilizes[i];
+
+
+            egr_info_p = tb_egr.lookup(&egr_id);
+            if(unlikely(!egr_info_p)) {
+                event.is_hop_latency |= is_hop_latencies << i;
+                event.is_tx_utilize |= is_tx_utilizes << i;
+            } else {
+                if (is_hop_latencies & (egr_info.hop_latency > HOP_LATENCY))
+                    event.is_hop_latency |= is_hop_latencies << i;
+                if (is_tx_utilizes & (egr_info.tx_utilize > TX_UTILIZE))
+                    event.is_tx_utilize |= is_tx_utilizes << i;
+            }
+
+            tb_egr.update(&egr_id, &egr_info);
+
+            num_INT_hop--;
+        }
+    }
+
+
+    /*
+        Queue info
+    */
     
-    // // if (cur_stat) {
-    // //     cur_stat->pkt_cnt += 1;
-    // //     cur_stat->len_cnt += skb->len;
-    // // }
+    struct queue_info_t *queue_info_p;
+    struct queue_id_t queue_id = {};
+    struct queue_info_t queue_info = {};
+
+    num_INT_hop = INT_md_fix->totalHopCnt;
+    #pragma unroll
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+        if (is_queue_occups | is_queue_congests) {
+            if (num_INT_hop <= 0)
+                break;
+                      
+            queue_id.sw_id = event.sw_ids[i];
+            queue_id.q_id = (is_queue_occups)? 
+                (event.queue_occups[i] >> 16) & 0xff : 
+                (event.queue_congests[i] >> 16) & 0xff;
+          
+            queue_info.occup = event.queue_occups[i] & 0xff;
+            queue_info.congest = event.queue_congests[i] & 0xff;
 
 
-    // //-------------------------------------------------
-    // // FORWARDING
+            queue_info_p = tb_queue.lookup(&queue_id);
+            if(unlikely(!queue_info_p)) {
+                event.is_queue_occup |= is_queue_occups << i;
+                event.is_queue_congest |= is_queue_congests << i;
+            } else {
+                if (is_queue_occups & (queue_info.occup > QUEUE_OCCUP))
+                    event.is_queue_occup |= is_queue_occups << i;
+                if (is_queue_congests & (queue_info.congest > QUEUE_CONGEST))
+                    event.is_queue_congest |= is_queue_congests << i;
+            }
 
-    // // tb_forward.update(&src_mac, &ingress_if);
+            tb_queue.update(&queue_id, &queue_info);
 
-    // // forward to dst port
-    // int *ifindex = tb_forward.lookup(&dst_mac);
-    
-    // if(ifindex) {
-    //     // bpf_trace_printk("to %d\n", *ifindex);
-    //     bpf_trace_printk("redirected! \n");
-    //     return bpf_redirect(*ifindex, TO_EGRESS);
-    //     // return XDP_DROP;
+            num_INT_hop--;
+        }
+    }
 
-    // } else {
-    //     // TODO: FLOOD
-    //     bpf_trace_printk("drop! \n");
-    //     return XDP_DROP;
-    // }
+
+
+    bpf_trace_printk("hop latency: %d\n", event.hop_latencies[0]);
+
+    // submit event to user space
+    if (event.is_path | event.is_hop_latency | event.is_queue_occup | 
+        event.is_queue_congest | event.is_tx_utilize
+    )
+        events.perf_submit(ctx, &event, sizeof(event));
 
 
 	return XDP_DROP;
