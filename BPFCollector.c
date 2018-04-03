@@ -162,7 +162,7 @@ struct queue_info_t {
 	u8 occup_ex;
 
 	u16 congest;
-	u8 congest_ex;
+    u8 congest_ex;
 
     u32 q_time;
 };
@@ -171,27 +171,29 @@ struct queue_info_t {
 // Events
 
 struct event_t {
-	// flow
-	u32 src_ip;
-	u32 dst_ip;
-	u16 src_port;
-	u16 dst_port;
-	u16 ip_proto;
-
-	u8 is_path;
-	u8 is_hop_latency;
-    u8 is_queue_occup;
-	u8 is_queue_congest;
-	u8 is_tx_utilize;
+    // flow
+    u32 src_ip;
+    u32 dst_ip;
+    u16 src_port;
+    u16 dst_port;
+    u16 ip_proto;
 
     u32 sw_ids[MAX_INT_HOP];
-    u32 in_e_port_ids[MAX_INT_HOP];
+    u16 in_port_ids[MAX_INT_HOP];
+    u16 e_port_ids[MAX_INT_HOP];
     u32 hop_latencies[MAX_INT_HOP];
-    u32 queue_occups[MAX_INT_HOP];
+    u16 queue_ids[MAX_INT_HOP];
+    u16 queue_occups[MAX_INT_HOP];
     u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
-    u32 queue_congests[MAX_INT_HOP];
+    u16 queue_congests[MAX_INT_HOP];
     u32 tx_utilizes[MAX_INT_HOP];
+
+    u8 is_path;
+    u8 is_hop_latency;
+    u8 is_queue_occup;
+    u8 is_queue_congest;
+    u8 is_tx_utilize;
 };
 
 BPF_PERF_OUTPUT(events);
@@ -276,8 +278,10 @@ int collector(struct xdp_md *ctx) {
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
         event.sw_ids[i] = 0;
-        event.in_e_port_ids[i] = 0;
+        event.in_port_ids[i] = 0;
+        event.e_port_ids[i] = 0;
         event.hop_latencies[i] = 0;
+        event.queue_ids[i] = 0;
         event.queue_occups[i] = 0;
         event.ingr_times[i] = 0;
         event.egr_times[i] = 0;
@@ -311,7 +315,8 @@ int collector(struct xdp_md *ctx) {
         }
         if (is_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            event.in_e_port_ids[i] = ntohl(INT_data->data);
+            event.in_port_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
+            event.e_port_ids[i] = ntohl(INT_data->data) & 0xff;
         }
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -319,7 +324,8 @@ int collector(struct xdp_md *ctx) {
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            event.queue_occups[i] = ntohl(INT_data->data);
+            event.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
+            event.queue_occups[i] = ntohl(INT_data->data) & 0xff;
         }
         if (is_ingr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -331,7 +337,8 @@ int collector(struct xdp_md *ctx) {
         }
         if (is_queue_congests) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            event.queue_congests[i] = ntohl(INT_data->data);
+            event.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
+            event.queue_congests[i] = ntohl(INT_data->data) & 0xff;
         }
         if (is_tx_utilizes) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -410,12 +417,12 @@ int collector(struct xdp_md *ctx) {
     num_INT_hop = INT_md_fix->totalHopCnt;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-        if (is_in_e_port_ids && (is_hop_latencies | is_tx_utilizes)) {
+        if (is_in_e_port_ids && (is_hop_latencies || is_tx_utilizes)) {
             if (num_INT_hop <= 0)
                 break;
                       
             egr_id.sw_id  = event.sw_ids[i];
-            egr_id.e_p_id = event.in_e_port_ids[i] & 0xff;
+            egr_id.e_p_id = event.e_port_ids[i];
           
             egr_info.hop_latency = event.hop_latencies[i];
             egr_info.egr_time    = event.egr_times[i];
@@ -456,12 +463,10 @@ int collector(struct xdp_md *ctx) {
                 break;
                       
             queue_id.sw_id = event.sw_ids[i];
-            queue_id.q_id = (is_queue_occups)? 
-                (event.queue_occups[i] >> 16) & 0xff : 
-                (event.queue_congests[i] >> 16) & 0xff;
+            queue_id.q_id = event.queue_ids[i];
           
-            queue_info.occup = event.queue_occups[i] & 0xff;
-            queue_info.congest = event.queue_congests[i] & 0xff;
+            queue_info.occup = event.queue_occups[i];
+            queue_info.congest = event.queue_congests[i];
 
 
             queue_info_p = tb_queue.lookup(&queue_id);

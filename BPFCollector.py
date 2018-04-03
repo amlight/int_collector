@@ -21,20 +21,22 @@ def process_event(ctx, data, size):
 					 ("dst_port", ct.c_ushort),
 					 ("ip_proto", ct.c_ushort),
 
+					 ("sw_ids", ct.c_uint32 * MAX_INT_HOP),
+					 ("in_port_ids", ct.c_uint16 * MAX_INT_HOP),
+					 ("e_port_ids", ct.c_uint16 * MAX_INT_HOP),
+					 ("hop_latencies", ct.c_uint32 * MAX_INT_HOP),
+					 ("queue_ids", ct.c_uint16 * MAX_INT_HOP),
+					 ("queue_occups", ct.c_uint16 * MAX_INT_HOP),
+					 ("ingr_times", ct.c_uint32 * MAX_INT_HOP),
+					 ("egr_times", ct.c_uint32 * MAX_INT_HOP),
+					 ("queue_congests", ct.c_uint16 * MAX_INT_HOP),
+					 ("tx_utilizes", ct.c_uint32 * MAX_INT_HOP),
+
 					 ("is_path", ct.c_ubyte),
 					 ("is_hop_latency", ct.c_ubyte),
 					 ("is_queue_occup", ct.c_ubyte),
 					 ("is_queue_congest", ct.c_ubyte),
-					 ("is_tx_utilize", ct.c_ubyte),
-
-					 ("sw_ids", ct.c_uint32 * MAX_INT_HOP),
-					 ("in_e_port_ids", ct.c_uint32 * MAX_INT_HOP),
-					 ("hop_latencies", ct.c_uint32 * MAX_INT_HOP),
-					 ("queue_occups", ct.c_uint32 * MAX_INT_HOP),
-					 ("ingr_times", ct.c_uint32 * MAX_INT_HOP),
-					 ("egr_times", ct.c_uint32 * MAX_INT_HOP),
-					 ("queue_congests", ct.c_uint32 * MAX_INT_HOP),
-					 ("tx_utilizes", ct.c_uint32 * MAX_INT_HOP)
+					 ("is_tx_utilize", ct.c_ubyte)
 					 ]
 
 	event = ct.cast(data, ct.POINTER(Event)).contents
@@ -42,9 +44,9 @@ def process_event(ctx, data, size):
 	print "-------------------------------------------------------"
 	for field_name, field_type in event._fields_:
 		field_arr = getattr(event, field_name)
-		
-		if field_name in ["sw_ids","in_e_port_ids","hop_latencies","queue_occups",
-						  "ingr_times","egr_times","queue_congests","tx_utilizes"]:
+
+		if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies","queue_occups",
+						  "queue_ids","ingr_times","egr_times","queue_congests","tx_utilizes"]:
 			_len = len(field_arr)
 			s = ""
 			for e in field_arr:
