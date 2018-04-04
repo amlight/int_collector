@@ -20,6 +20,9 @@ def process_event(ctx, data, size):
 					 ("src_port", ct.c_ushort),
 					 ("dst_port", ct.c_ushort),
 					 ("ip_proto", ct.c_ushort),
+					 
+					 ("pkt_cnt", ct.c_uint64),
+					 ("byte_cnt", ct.c_uint64),
 
 					 ("sw_ids", ct.c_uint32 * MAX_INT_HOP),
 					 ("in_port_ids", ct.c_uint16 * MAX_INT_HOP),

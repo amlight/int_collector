@@ -21,6 +21,8 @@
 #define NULL32 0xFFFFFFFF
 #define NULL16 0xFFFF
 
+
+// TODO: set these values from use space
 #define HOP_LATENCY 50
 #define QUEUE_OCCUP 50
 #define QUEUE_CONGEST 50
@@ -174,6 +176,9 @@ struct flow_info_t {
     u16 dst_port;
     u16 ip_proto;
 
+    u64 pkt_cnt;
+    u64 byte_cnt;
+
     u32 sw_ids[MAX_INT_HOP];
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
@@ -194,7 +199,7 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
-BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
+BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 5024000);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
 BPF_TABLE("hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
@@ -270,6 +275,9 @@ int collector(struct xdp_md *ctx) {
     flow_info.src_port = ntohs(in_udp->source);
     flow_info.dst_port = ntohs(in_udp->dest);
     flow_info.ip_proto = in_ip->protocol;
+
+    flow_info.pkt_cnt = 0;
+    flow_info.byte_cnt = 0;
 
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
@@ -382,6 +390,9 @@ int collector(struct xdp_md *ctx) {
         
         flow_info.is_path = 1;
 
+        flow_info.pkt_cnt++;
+        flow_info.byte_cnt += ntohs(ip->tot_len);
+
     } else {
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
@@ -390,9 +401,13 @@ int collector(struct xdp_md *ctx) {
                 break;
             }
         }
+
+        flow_info.pkt_cnt = flow_info_p->pkt_cnt + 1;
+        flow_info.byte_cnt = flow_info_p->byte_cnt + ntohs(ip->tot_len);
     }
 
     tb_flow.update(&flow_id, &flow_info);
+
 
 
     /*
