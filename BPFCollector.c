@@ -137,7 +137,7 @@ struct ingr_info_t {
 
 struct egr_id_t {
 	u32 sw_id;
-	u16 e_p_id;
+	u16 p_id;
 };
 
 struct egr_info_t {
@@ -190,6 +190,12 @@ struct flow_info_t {
     u16 queue_congests[MAX_INT_HOP];
     u32 tx_utilizes[MAX_INT_HOP];
 
+    u8 is_n_flow;
+    u8 is_n_hop_latency;
+    u8 is_n_queue_occup;
+    u8 is_n_queue_congest;
+    u8 is_n_tx_utilize;
+
     u8 is_path;
     u8 is_hop_latency;
     u8 is_queue_occup;
@@ -199,11 +205,12 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
-BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 5024000);
+BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
 BPF_TABLE("hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
 BPF_TABLE("hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
+BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
 
 
 //--------------------------------------------------------------------
@@ -292,6 +299,13 @@ int collector(struct xdp_md *ctx) {
         flow_info.queue_congests[i] = 0;
         flow_info.tx_utilizes[i] = 0;
     }
+
+
+    flow_info.is_n_flow = 0;
+    flow_info.is_n_hop_latency = 0;
+    flow_info.is_n_queue_occup = 0;
+    flow_info.is_n_queue_congest = 0;
+    flow_info.is_n_tx_utilize = 0;
 
     flow_info.is_path = 0;
     flow_info.is_hop_latency = 0;
@@ -386,9 +400,9 @@ int collector(struct xdp_md *ctx) {
     flow_id.ip_proto = flow_info.ip_proto;
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
-    if (!flow_info_p) {
+    if (unlikely(!flow_info_p)) {
         
-        flow_info.is_path = 1;
+        flow_info.is_n_flow = 1;
 
         flow_info.pkt_cnt++;
         flow_info.byte_cnt += ntohs(ip->tot_len);
@@ -396,7 +410,7 @@ int collector(struct xdp_md *ctx) {
     } else {
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
-            if (flow_info.sw_ids[i] != flow_info_p->sw_ids[i]) {
+            if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 flow_info.is_path = 1;
                 break;
             }
@@ -426,7 +440,7 @@ int collector(struct xdp_md *ctx) {
                 break;
                       
             egr_id.sw_id  = flow_info.sw_ids[i];
-            egr_id.e_p_id = flow_info.e_port_ids[i];
+            egr_id.p_id = flow_info.e_port_ids[i];
           
             egr_info.hop_latency = flow_info.hop_latencies[i];
             egr_info.egr_time    = flow_info.egr_times[i];
@@ -435,12 +449,12 @@ int collector(struct xdp_md *ctx) {
 
             egr_info_p = tb_egr.lookup(&egr_id);
             if(unlikely(!egr_info_p)) {
-                flow_info.is_hop_latency |= is_hop_latencies << i;
-                flow_info.is_tx_utilize |= is_tx_utilizes << i;
+                flow_info.is_n_hop_latency |= is_hop_latencies << i;
+                flow_info.is_n_tx_utilize |= is_tx_utilizes << i;
             } else {
-                if (is_hop_latencies & (egr_info.hop_latency > HOP_LATENCY))
+                if (unlikely(is_hop_latencies & (egr_info.hop_latency > HOP_LATENCY)))
                     flow_info.is_hop_latency |= is_hop_latencies << i;
-                if (is_tx_utilizes & (egr_info.tx_utilize > TX_UTILIZE))
+                if (unlikely(is_tx_utilizes & (egr_info.tx_utilize > TX_UTILIZE)))
                     flow_info.is_tx_utilize |= is_tx_utilizes << i;
             }
 
@@ -475,12 +489,12 @@ int collector(struct xdp_md *ctx) {
 
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
-                flow_info.is_queue_occup |= is_queue_occups << i;
-                flow_info.is_queue_congest |= is_queue_congests << i;
+                flow_info.is_n_queue_occup |= is_queue_occups << i;
+                flow_info.is_n_queue_congest |= is_queue_congests << i;
             } else {
-                if (is_queue_occups & (queue_info.occup > QUEUE_OCCUP))
+                if (unlikely(is_queue_occups & (queue_info.occup > QUEUE_OCCUP)))
                     flow_info.is_queue_occup |= is_queue_occups << i;
-                if (is_queue_congests & (queue_info.congest > QUEUE_CONGEST))
+                if (unlikely(is_queue_congests & (queue_info.congest > QUEUE_CONGEST)))
                     flow_info.is_queue_congest |= is_queue_congests << i;
             }
 
@@ -495,8 +509,10 @@ int collector(struct xdp_md *ctx) {
     bpf_trace_printk("hop latency: %d\n", flow_info.hop_latencies[0]);
 
     // submit event info to user space
-    if (flow_info.is_path | flow_info.is_hop_latency | flow_info.is_queue_occup | 
-        flow_info.is_queue_congest | flow_info.is_tx_utilize
+    if (unlikely(flow_info.is_n_flow | flow_info.is_n_hop_latency |
+        flow_info.is_n_queue_occup | flow_info.is_n_queue_congest | 
+        flow_info.is_n_tx_utilize | flow_info.is_path | flow_info.is_hop_latency | 
+        flow_info.is_queue_occup | flow_info.is_queue_congest | flow_info.is_tx_utilize)
     )
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
 
