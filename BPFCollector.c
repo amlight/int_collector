@@ -30,7 +30,7 @@
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
 	({  _target = _cursor; _cursor += _len; \
-  		if(_cursor > _data_end) return XDP_DROP; })
+  		if(unlikely(_cursor > _data_end)) return XDP_DROP; })
 
 //--------------------------------------------------------------------
 // Protocols
