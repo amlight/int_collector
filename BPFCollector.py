@@ -129,6 +129,8 @@ class BPFCollector(object):
 							 ("queue_congests", ct.c_uint16 * self.MAX_INT_HOP),
 							 ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
 
+							 ("flow_latency", ct.c_uint32),
+
 							 ("is_n_flow", ct.c_ubyte),
 							 ("is_n_hop_latency", ct.c_ubyte),
 							 ("is_n_queue_occup", ct.c_ubyte),

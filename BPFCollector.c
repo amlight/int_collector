@@ -188,6 +188,8 @@ struct flow_info_t {
     u16 queue_congests[MAX_INT_HOP];
     u32 tx_utilizes[MAX_INT_HOP];
 
+    u32 flow_latency;
+
     u8 is_n_flow;
     u8 is_n_hop_latency;
     u8 is_n_queue_occup;
@@ -340,6 +342,7 @@ int collector(struct xdp_md *ctx) {
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             flow_info.hop_latencies[i] = ntohl(INT_data->data);
+            flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
