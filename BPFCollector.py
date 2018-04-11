@@ -38,8 +38,8 @@ class BPFCollector(object):
 			['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])	
 		self.g_flow_byte_cnt = Gauge('flow_byte_cnt', 'flow byte count',
 			['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])		
-		self.g_hop_latency = Gauge('hop_latency', 'hop latency of egress port', 
-			['sw_id', 'p_id'])
+		self.g_flow_hop_latencies = Gauge('flow_hop_latencies', 'hops latency of flow', 
+			['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
 		self.g_tx_utilize = Gauge('tx_utilize', 'tx link utilization',
 			['sw_id', 'p_id'])		
 		self.g_queue_occup = Gauge('queue_occup', 'queue occupancy',
@@ -78,11 +78,10 @@ class BPFCollector(object):
 			return val.byte_cnt
 		return _get_flow_byte_cnt
 
-	def get_hop_latency(self, sw_id, p_id):
-		def _get_hop_latency():
-			key = self.tb_egr.Key(sw_id, p_id)
-			val = self.tb_egr[key]
-			return val.hop_latency
+	def get_flow_hop_latencies(self, src_ip, dst_ip, src_port, dst_port, ip_proto):
+		def _get_flow_hop_latencies():
+			#TODO: complete this function
+			return 0
 		return _get_hop_latency
 
 	def get_tx_utilize(self, sw_id, p_id):
@@ -161,14 +160,14 @@ class BPFCollector(object):
 										   event.dst_ip, event.src_port, \
 										   event.dst_port, event.ip_proto))
 
-			if event.is_n_hop_latency:
-				for i in range(0, self.MAX_INT_HOP):
-					if ((event.is_n_hop_latency >> i) & 0x01):
-						self.g_hop_latency.labels(event.sw_ids[i],\
-												  event.e_port_ids[i]) \
-										.set_function(self.get_hop_latency( \
-											      event.sw_ids[i], \
-											      event.e_port_ids[i]))
+			# if event.is_n_hop_latency:
+			# 	for i in range(0, self.MAX_INT_HOP):
+			# 		if ((event.is_n_hop_latency >> i) & 0x01):
+			# 			self.g_hop_latency.labels(event.sw_ids[i],\
+			# 									  event.e_port_ids[i]) \
+			# 							.set_function(self.get_hop_latency( \
+			# 								      event.sw_ids[i], \
+			# 								      event.e_port_ids[i]))
 			if event.is_n_tx_utilize:
 				for i in range(0, self.MAX_INT_HOP):
 					if ((event.is_n_tx_utilize >> i) & 0x01):

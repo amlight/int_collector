@@ -142,13 +142,10 @@ struct egr_id_t {
 };
 
 struct egr_info_t {
-	u32 hop_latency;
-	u8 lantency_ex;
-
-	u32 egr_time;
-
 	u32 tx_utilize;
 	u8 utilize_ex;
+
+    u32 egr_time;
 };
 
 struct queue_id_t {
@@ -407,15 +404,42 @@ int collector(struct xdp_md *ctx) {
         
         flow_info.is_n_flow = 1;
 
+        switch (INT_md_fix->totalHopCnt) {
+            case 1: flow_info.is_n_hop_latency = 0x01; break;
+            case 2: flow_info.is_n_hop_latency = 0x03; break;
+            case 3: flow_info.is_n_hop_latency = 0x07; break;
+            case 4: flow_info.is_n_hop_latency = 0x0f; break;
+            case 5: flow_info.is_n_hop_latency = 0x1f; break;
+            case 6: flow_info.is_n_hop_latency = 0x3f; break;
+            case 7: flow_info.is_n_hop_latency = 0x7f; break;
+            case 8: flow_info.is_n_hop_latency = 0xff; break;
+            default: break;
+        }
+
         flow_info.pkt_cnt++;
         flow_info.byte_cnt += ntohs(ip->tot_len);
 
     } else {
+
+        num_INT_hop = INT_md_fix->totalHopCnt;
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
+            
+
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 flow_info.is_path = 1;
-                break;
+                if (is_hop_latencies)
+                    flow_info.is_n_hop_latency |= 1 << i;
+            }
+
+            if (is_hop_latencies && (flow_info.hop_latencies[i] > HOP_LATENCY))
+                flow_info.is_hop_latency |= 1 << i;
+
+            // no need for the final round
+            if (i < MAX_INT_HOP - 1) {      
+                num_INT_hop--;
+                if (num_INT_hop <= 0)
+                    break;
             }
         }
 
@@ -440,14 +464,13 @@ int collector(struct xdp_md *ctx) {
     num_INT_hop = INT_md_fix->totalHopCnt;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-        if (is_in_e_port_ids && (is_hop_latencies || is_tx_utilizes)) {
+        if (is_in_e_port_ids && is_tx_utilizes) {
             if (num_INT_hop <= 0)
                 break;
                       
             egr_id.sw_id  = flow_info.sw_ids[i];
             egr_id.p_id = flow_info.e_port_ids[i];
           
-            egr_info.hop_latency = flow_info.hop_latencies[i];
             egr_info.egr_time    = flow_info.egr_times[i];
             egr_info.tx_utilize  = flow_info.tx_utilizes[i];
 
@@ -455,16 +478,11 @@ int collector(struct xdp_md *ctx) {
 
             egr_info_p = tb_egr.lookup(&egr_id);
             if(unlikely(!egr_info_p)) {
-                flow_info.is_n_hop_latency |= is_hop_latencies << i;
-                flow_info.is_n_tx_utilize |= is_tx_utilizes << i;
-                is_update = 1;
+                flow_info.is_n_tx_utilize |= 1 << i;
+                is_update = 1; 
             } else {
-                if (unlikely(is_hop_latencies & (egr_info.hop_latency > HOP_LATENCY))) {
-                    flow_info.is_hop_latency |= is_hop_latencies << i;
-                    is_update = 1;
-                }
-                if (unlikely(is_tx_utilizes & (egr_info.tx_utilize > TX_UTILIZE))) {
-                    flow_info.is_tx_utilize |= is_tx_utilizes << i;
+                if (unlikely(egr_info.tx_utilize > TX_UTILIZE)) {
+                    flow_info.is_tx_utilize |= 1 << i;
                     is_update = 1;
                 }
 
@@ -506,18 +524,20 @@ int collector(struct xdp_md *ctx) {
 
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
-                flow_info.is_n_queue_occup |= is_queue_occups << i;
-                flow_info.is_n_queue_congest |= is_queue_congests << i;
+                if (is_queue_occups)
+                    flow_info.is_n_queue_occup |= 1 << i;
+                if (is_queue_congests)
+                    flow_info.is_n_queue_congest |= 1 << i;
 
                 is_update = 1;
 
             } else {
                 if (unlikely(is_queue_occups & (queue_info.occup > QUEUE_OCCUP))) {
-                    flow_info.is_queue_occup |= is_queue_occups << i;
+                    flow_info.is_queue_occup |= 1 << i;
                     is_update = 1;
                 }
                 if (unlikely(is_queue_congests & (queue_info.congest > QUEUE_CONGEST))) {
-                    flow_info.is_queue_congest |= is_queue_congests << i;
+                    flow_info.is_queue_congest |= 1 << i;
                     is_update = 1;
                 }
 
