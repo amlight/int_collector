@@ -177,6 +177,8 @@ struct flow_info_t {
     u64 pkt_cnt;
     u64 byte_cnt;
 
+    u8 num_INT_hop;
+
     u32 sw_ids[MAX_INT_HOP];
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
@@ -285,6 +287,7 @@ int collector(struct xdp_md *ctx) {
     flow_info.src_port = ntohs(in_udp->source);
     flow_info.dst_port = ntohs(in_udp->dest);
     flow_info.ip_proto = in_ip->protocol;
+    flow_info.num_INT_hop = INT_md_fix->totalHopCnt;
 
     // flow_info.pkt_cnt = 0;
     // flow_info.byte_cnt = 0;
