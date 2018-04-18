@@ -191,6 +191,7 @@ struct flow_info_t {
     u32 tx_utilizes[MAX_INT_HOP];
 
     u32 flow_latency;
+    u32 flow_sink_time;
 
     u8 is_n_flow;
     u8 is_n_hop_latency;
@@ -287,7 +288,9 @@ int collector(struct xdp_md *ctx) {
     flow_info.src_port = ntohs(in_udp->source);
     flow_info.dst_port = ntohs(in_udp->dest);
     flow_info.ip_proto = in_ip->protocol;
+
     flow_info.num_INT_hop = INT_md_fix->totalHopCnt;
+    flow_info.flow_sink_time = ntohl(tm_rp->ingressTimestamp);
 
     // flow_info.pkt_cnt = 0;
     // flow_info.byte_cnt = 0;
