@@ -6,13 +6,13 @@ from prometheus_client import start_http_server, Summary
 from prometheus_client import Gauge
 from influxdb import InfluxDBClient
 # from collections import defaultdict
+from ipaddress import IPv4Address
 import time
 import json
 import multiprocessing
 import sys
 # import netifaces
 # import os
-# import ipaddress
 import ctypes as ct
 
 class InDBCollector(object):
@@ -111,94 +111,69 @@ class InDBCollector(object):
             event_data = []
             
             if event.is_n_flow:
-                event_data.append({"measurement": "flow_pkt_cnt",
-                            "time": event.flow_sink_time,
-                            "fields": {
-                                "src_ip"  : event.src_ip,
-                                "dst_ip"  : event.dst_ip,
-                                "src_port": event.src_port,
-                                "dst_port": event.dst_port,
-                                "ip_proto": event.ip_proto,
-                                "value"   : event.pkt_cnt
-                            }
-                        })
-
-                event_data.append({"measurement": "flow_byte_cnt",
-                            "time": event.flow_sink_time,
-                            "fields": {
-                                "src_ip"  : event.src_ip,
-                                "dst_ip"  : event.dst_ip,
-                                "src_port": event.src_port,
-                                "dst_port": event.dst_port,
-                                "ip_proto": event.ip_proto,
-                                "value"   : event.byte_cnt
-                            }
-                        })
-
-                event_data.append({"measurement": "flow_latency",
-                            "time": event.flow_sink_time,
-                            "fields": {
-                                "src_ip"  : event.src_ip,
-                                "dst_ip"  : event.dst_ip,
-                                "src_port": event.src_port,
-                                "dst_port": event.dst_port,
-                                "ip_proto": event.ip_proto,
-                                "value"   : event.flow_latency
-                            }
-                        })
+                event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
+                                                    str(IPv4Address(event.src_ip)),
+                                                    event.src_port,
+                                                    str(IPv4Address(event.dst_ip)),
+                                                    event.dst_port,
+                                                    event.ip_proto),
+                                    "time": event.flow_sink_time*1000000000,
+                                    "fields": {
+                                        "pkt_cnt"  : event.pkt_cnt,
+                                        "byte_cnt" : event.byte_cnt,
+                                        "flow_latency" : event.flow_latency
+                                    }
+                                })
 
                 if event.is_n_hop_latency:
                     for i in range(0, event.num_INT_hop):
                         if ((event.is_n_hop_latency >> i) & 0x01):
-                            event_data.append({"measurement": "flow_hop_latency",
-                                        "time": event.egr_times[i],
-                                        "fields": {
-                                            "src_ip"  : event.src_ip,
-                                            "dst_ip"  : event.dst_ip,
-                                            "src_port": event.src_port,
-                                            "dst_port": event.dst_port,
-                                            "ip_proto": event.ip_proto,
-                                            "sw_id"   : event.sw_ids[i],
-                                            "value"   : event.hop_latencies[i]
-                                        }
-                                    })
+                            event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
+                                                                str(IPv4Address(event.src_ip)),
+                                                                event.src_port,
+                                                                str(IPv4Address(event.dst_ip)),
+                                                                event.dst_port,
+                                                                event.ip_proto,
+                                                                event.sw_ids[i]),
+                                                "time": event.egr_times[i]*1000000000,
+                                                "fields": {
+                                                    "value" : event.hop_latencies[i]
+                                                }
+                                            })
 
 
             if event.is_n_tx_utilize:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_n_tx_utilize >> i) & 0x01):
-                        event_data.append({"measurement": "tx_utilize",
-                                    "time": event.egr_times[i],
-                                    "fields": {
-                                        "sw_id": event.sw_ids[i],
-                                        "p_id" : event.e_port_ids[i],
-                                        "value": event.tx_utilizes[i]
-                                    }
-                                })
+                        event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
+                                                           event.sw_ids[i], event.e_port_ids[i]),
+                                            "time": event.egr_times[i]*1000000000,
+                                            "fields": {
+                                                "value": event.tx_utilizes[i]
+                                            }
+                                        })
 
             if event.is_n_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_n_queue_occup >> i) & 0x01):
-                        event_data.append({"measurement": "queue_occup",
-                                    "time": event.egr_times[i],
-                                    "fields": {
-                                        "sw_id": event.sw_ids[i],
-                                        "q_id" : event.queue_ids[i],
-                                        "value": event.queue_occups[i]
-                                    }
-                                })
+                        event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
+                                                            event.sw_ids[i], event.queue_ids[i]),
+                                            "time": event.egr_times[i]*1000000000,
+                                            "fields": {
+                                                "value": event.queue_occups[i],
+                                            }
+                                        })
 
             if event.is_n_queue_congest:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_n_queue_congest >> i) & 0x01):
-                        event_data.append({"measurement": "queue_congest",
-                                    "time": event.egr_times[i],
-                                    "fields": {
-                                        "sw_id": event.sw_ids[i],
-                                        "q_id" : event.queue_ids[i],
-                                        "value": event.queue_congests[i]
-                                    }
-                                })
+                        event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
+                                                            event.sw_ids[i], event.queue_ids[i]),
+                                            "time": event.egr_times[i]*1000000000,
+                                            "fields": {
+                                                "value": event.queue_congests[i]
+                                            }
+                                        })
 
             self.client.write_points(points=event_data)
             
@@ -229,85 +204,60 @@ class InDBCollector(object):
         data = []
 
         for (flow_id, flow_info) in self.tb_flow.items():
-            data.append({"measurement": "flow_pkt_cnt",
-                        "time": flow_info.flow_sink_time,
-                        "fields": {
-                            "src_ip"  : flow_id.src_ip,
-                            "dst_ip"  : flow_id.dst_ip,
-                            "src_port": flow_id.src_port,
-                            "dst_port": flow_id.dst_port,
-                            "ip_proto": flow_id.ip_proto,
-                            "value"   : flow_info.pkt_cnt
-                        }
-                    })
-
-            data.append({"measurement": "flow_byte_cnt",
-                        "time": flow_info.flow_sink_time,
-                        "fields": {
-                            "src_ip"  : flow_id.src_ip,
-                            "dst_ip"  : flow_id.dst_ip,
-                            "src_port": flow_id.src_port,
-                            "dst_port": flow_id.dst_port,
-                            "ip_proto": flow_id.ip_proto,
-                            "value"   : flow_info.byte_cnt
-                        }
-                    })
-
-            data.append({"measurement": "flow_latency",
-                        "time": flow_info.flow_sink_time,
-                        "fields": {
-                            "src_ip"  : flow_id.src_ip,
-                            "dst_ip"  : flow_id.dst_ip,
-                            "src_port": flow_id.src_port,
-                            "dst_port": flow_id.dst_port,
-                            "ip_proto": flow_id.ip_proto,
-                            "value"   : flow_info.flow_latency
-                        }
-                    })
-
-            for i in range(0, flow_info.num_INT_hop):
-                data.append({"measurement": "flow_hop_latency",
-                            "time": flow_info.egr_times[i],
+            data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
+                                                    str(IPv4Address(flow_id.src_ip)),
+                                                    flow_id.src_port,
+                                                    str(IPv4Address(flow_id.dst_ip)),
+                                                    flow_id.dst_port,
+                                                    flow_id.ip_proto),
+                            "time": flow_info.flow_sink_time*1000000000,
                             "fields": {
-                                "src_ip"  : flow_id.src_ip,
-                                "dst_ip"  : flow_id.dst_ip,
-                                "src_port": flow_id.src_port,
-                                "dst_port": flow_id.dst_port,
-                                "ip_proto": flow_id.ip_proto,
-                                "sw_id"   : flow_info.sw_ids[i],
-                                "value"   : flow_info.hop_latencies[i]
+                                "pkt_cnt"  : flow_info.pkt_cnt,
+                                "byte_cnt" : flow_info.byte_cnt,
+                                "flow_latency" : flow_info.flow_latency
                             }
                         })
 
+            for i in range(0, flow_info.num_INT_hop):
+                data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
+                                                            str(IPv4Address(flow_id.src_ip)),
+                                                            flow_id.src_port,
+                                                            str(IPv4Address(flow_id.dst_ip)),
+                                                            flow_id.dst_port,
+                                                            flow_id.ip_proto,
+                                                            flow_info.sw_ids[i]),
+                                "time": flow_info.egr_times[i]*1000000000,
+                                "fields": {
+                                    "value" : flow_info.hop_latencies[i]
+                                }
+                            })
+
 
         for (egr_id, egr_info) in self.tb_egr.items():
-            data.append({"measurement": "tx_utilize",
-                        "time": egr_info.egr_time,
-                        "fields": {
-                            "sw_id": egr_id.sw_id,
-                            "p_id" : egr_id.p_id,
-                            "value": egr_info.tx_utilize
-                        }
-                    })
+            data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
+                                        egr_id.sw_id, egr_id.p_id),
+                            "time": egr_info.egr_time*1000000000,
+                            "fields": {
+                                "value": egr_info.tx_utilize
+                            }
+                        })
 
         for (queue_id, queue_info) in self.tb_queue.items():
-            data.append({"measurement": "queue_occup",
-                        "time": queue_info.q_time,
-                        "fields": {
-                            "sw_id": queue_id.sw_id,
-                            "q_id" : queue_id.q_id,
-                            "value": queue_info.occup
-                        }
-                    })
+            data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
+                                        queue_id.sw_id, queue_id.q_id),
+                            "time": queue_info.q_time*1000000000,
+                            "fields": {
+                                "value": queue_info.occup,
+                            }
+                        })
 
-            data.append({"measurement": "queue_congest",
-                        "time": queue_info.q_time,
-                        "fields": {
-                            "sw_id": queue_id.sw_id,
-                            "q_id" : queue_id.q_id,
-                            "value": queue_info.congest
-                        }
-                    })
+            data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
+                                        queue_id.sw_id, queue_id.q_id),
+                            "time": queue_info.q_time*1000000000,
+                            "fields": {
+                                "value": queue_info.congest
+                            }
+                        })
 
 
         return data
@@ -360,15 +310,15 @@ if __name__ == "__main__":
     finally:
 
         poll_stop_flag = 1
-        poll_event_proc.join()
+        # poll_event_proc.join()
 
-        print "flow_pkt_cnt: ", collector.client.query(query="select * from flow_pkt_cnt"), "\n"
-        print "flow_byte_cnt: ", collector.client.query(query="select * from flow_byte_cnt"), "\n"
-        print "flow_latency: ", collector.client.query(query="select * from flow_latency"), "\n"
-        print "flow_hop_latency: ", collector.client.query(query="select * from flow_hop_latency"), "\n"
-        print "tx_utilize: ", collector.client.query(query="select * from tx_utilize"), "\n"
-        print "queue_occup: ", collector.client.query(query="select * from queue_occup"), "\n"
-        print "queue_congest: ", collector.client.query(query="select * from queue_congest"), "\n"
+        print "flow_pkt_cnt: ", collector.client.query(query="select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\""), "\n"
+        # print "flow_byte_cnt: ", collector.client.query(query="select * from flow_byte_cnt"), "\n"
+        # print "flow_latency: ", collector.client.query(query="select * from flow_latency"), "\n"
+        # print "flow_hop_latency: ", collector.client.query(query="select * from flow_hop_latency"), "\n"
+        # print "tx_utilize: ", collector.client.query(query="select * from tx_utilize"), "\n"
+        # print "queue_occup: ", collector.client.query(query="select * from queue_occup"), "\n"
+        # print "queue_congest: ", collector.client.query(query="select * from queue_congest"), "\n"
 
         collector.detach_iface("veth1")
         print("Done")
