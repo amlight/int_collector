@@ -213,7 +213,7 @@ BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
 BPF_TABLE("hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
 BPF_TABLE("hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
-BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
+// BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
 
 
 //--------------------------------------------------------------------

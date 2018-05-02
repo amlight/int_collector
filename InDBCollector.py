@@ -33,7 +33,7 @@ class InDBCollector(object):
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
-        self.tb_test = self.bpf_collector.get_table("tb_test")
+        # self.tb_test = self.bpf_collector.get_table("tb_test")
 
         self.flow_paths = {}
 
@@ -269,7 +269,8 @@ class InDBCollector(object):
 if __name__ == "__main__":
 
     collector = InDBCollector()
-    collector.attach_iface("veth1")
+    iface = "ens4"
+    collector.attach_iface(iface)
 
     # clear all old dbs. For easy testing
     for db in collector.client.get_list_database():
@@ -320,7 +321,7 @@ if __name__ == "__main__":
         # print "queue_occup: ", collector.client.query(query="select * from queue_occup"), "\n"
         # print "queue_congest: ", collector.client.query(query="select * from queue_congest"), "\n"
 
-        collector.detach_iface("veth1")
+        collector.detach_iface(iface)
         print("Done")
 
     print "Exit"
