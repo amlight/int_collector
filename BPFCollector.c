@@ -174,8 +174,8 @@ struct flow_info_t {
     u16 dst_port;
     u16 ip_proto;
 
-    u64 pkt_cnt;
-    u64 byte_cnt;
+    // u64 pkt_cnt;
+    // u64 byte_cnt;
 
     u8 num_INT_hop;
 
@@ -211,8 +211,8 @@ BPF_PERF_OUTPUT(events);
 BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
-BPF_TABLE("hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
-BPF_TABLE("hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
+BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
+BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
 // BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
 
 
@@ -237,17 +237,17 @@ int collector(struct xdp_md *ctx) {
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
 
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
-        return XDP_PASS;
+        return XDP_DROP;
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
 
     if (unlikely(ip->protocol != IPPROTO_UDP))
-        return XDP_PASS;
+        return XDP_DROP;
     struct udphdr *udp;
     CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
 
     if (unlikely(ntohs(udp->dest) != INT_DST_PORT))
-        return XDP_PASS;
+        return XDP_DROP;
     struct telemetry_report_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
@@ -281,7 +281,7 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_data_t *INT_data;
 
-    static const struct flow_info_t empty_flow_info;
+    static const struct flow_info_t empty_flow_info; // all init to zero
     struct flow_info_t flow_info = empty_flow_info;
     flow_info.src_ip = ntohl(in_ip->saddr);
     flow_info.dst_ip = ntohl(in_ip->daddr);
@@ -395,11 +395,13 @@ int collector(struct xdp_md *ctx) {
     */
 
     // Assume that sw_id is alway presented.
-    if (unlikely(!is_sw_ids)) return XDP_PASS;
+    if (unlikely(!is_sw_ids)) return XDP_DROP;
 
     /*
         Path store and change-detection
     */
+
+    u8 is_update = 0;
 
     struct flow_id_t flow_id = {};
     flow_id.src_ip = flow_info.src_ip;
@@ -412,6 +414,7 @@ int collector(struct xdp_md *ctx) {
     if (unlikely(!flow_info_p)) {
         
         flow_info.is_n_flow = 1;
+        is_update = 1;
 
         switch (INT_md_fix->totalHopCnt) {
             case 1: flow_info.is_n_hop_latency = 0x01; break;
@@ -425,10 +428,14 @@ int collector(struct xdp_md *ctx) {
             default: break;
         }
 
-        flow_info.pkt_cnt++;
-        flow_info.byte_cnt += ntohs(ip->tot_len);
+        // flow_info.pkt_cnt++;
+        // flow_info.byte_cnt += ntohs(ip->tot_len);
 
     } else {
+
+        if (flow_info.flow_sink_time > flow_info_p->flow_sink_time + TIME_GAP_W) {
+                is_update = 1;
+            }
 
         num_INT_hop = INT_md_fix->totalHopCnt;
         #pragma unroll
@@ -437,12 +444,15 @@ int collector(struct xdp_md *ctx) {
 
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 flow_info.is_path = 1;
+                is_update = 1;
                 if (is_hop_latencies)
                     flow_info.is_n_hop_latency |= 1 << i;
             }
 
-            if (is_hop_latencies && (flow_info.hop_latencies[i] > HOP_LATENCY))
+            if (is_hop_latencies && (flow_info.hop_latencies[i] > HOP_LATENCY)) {
                 flow_info.is_hop_latency |= 1 << i;
+                is_update = 1;
+            }
 
             // no need for the final round
             if (i < MAX_INT_HOP - 1) {      
@@ -452,11 +462,12 @@ int collector(struct xdp_md *ctx) {
             }
         }
 
-        flow_info.pkt_cnt = flow_info_p->pkt_cnt + 1;
-        flow_info.byte_cnt = flow_info_p->byte_cnt + ntohs(ip->tot_len);
+        // flow_info.pkt_cnt = flow_info_p->pkt_cnt + 1;
+        // flow_info.byte_cnt = flow_info_p->byte_cnt + ntohs(ip->tot_len);
     }
 
-    tb_flow.update(&flow_id, &flow_info);
+    if (is_update)
+        tb_flow.update(&flow_id, &flow_info);
 
 
 
@@ -464,7 +475,7 @@ int collector(struct xdp_md *ctx) {
         Egress info
     */
 
-    u8 is_update = 0;
+    is_update = 0;
 
     struct egr_info_t *egr_info_p;
     struct egr_id_t egr_id = {};

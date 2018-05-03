@@ -37,8 +37,8 @@ class InDBCollector(object):
 
         self.flow_paths = {}
 
-        self.flow_pkt_cnt = []
-        self.flow_byte_cnt = []
+        # self.flow_pkt_cnt = []
+        # self.flow_byte_cnt = []
         self.flow_latency = []
         self.flow_hop_latency = []
         self.tx_utilize = []
@@ -72,8 +72,8 @@ class InDBCollector(object):
                              ("dst_port", ct.c_ushort),
                              ("ip_proto", ct.c_ushort),
                              
-                             ("pkt_cnt", ct.c_uint64),
-                             ("byte_cnt", ct.c_uint64),
+                             # ("pkt_cnt", ct.c_uint64),
+                             # ("byte_cnt", ct.c_uint64),
 
                              ("num_INT_hop", ct.c_ubyte),
 
@@ -119,8 +119,8 @@ class InDBCollector(object):
                                                     event.ip_proto),
                                     "time": event.flow_sink_time*1000000000,
                                     "fields": {
-                                        "pkt_cnt"  : event.pkt_cnt,
-                                        "byte_cnt" : event.byte_cnt,
+                                        # "pkt_cnt"  : event.pkt_cnt,
+                                        # "byte_cnt" : event.byte_cnt,
                                         "flow_latency" : event.flow_latency
                                     }
                                 })
@@ -212,8 +212,8 @@ class InDBCollector(object):
                                                     flow_id.ip_proto),
                             "time": flow_info.flow_sink_time*1000000000,
                             "fields": {
-                                "pkt_cnt"  : flow_info.pkt_cnt,
-                                "byte_cnt" : flow_info.byte_cnt,
+                                # "pkt_cnt"  : flow_info.pkt_cnt,
+                                # "byte_cnt" : flow_info.byte_cnt,
                                 "flow_latency" : flow_info.flow_latency
                             }
                         })
@@ -295,7 +295,7 @@ if __name__ == "__main__":
         print "eBPF progs Loaded"
         while 1:
 
-            time.sleep(2)
+            time.sleep(5)
 
             data = collector.collect_data()
 
@@ -313,7 +313,7 @@ if __name__ == "__main__":
         poll_stop_flag = 1
         # poll_event_proc.join()
 
-        print "flow_pkt_cnt: ", collector.client.query(query="select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\""), "\n"
+        # print "flow_pkt_cnt: ", collector.client.query(query="select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\""), "\n"
         # print "flow_byte_cnt: ", collector.client.query(query="select * from flow_byte_cnt"), "\n"
         # print "flow_latency: ", collector.client.query(query="select * from flow_latency"), "\n"
         # print "flow_hop_latency: ", collector.client.query(query="select * from flow_hop_latency"), "\n"

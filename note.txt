@@ -52,6 +52,7 @@ https://www.slideshare.net/lcplcp1/xdp-and-ebpfmaps
 
 #pktgen
 ./pktgen.sh -i vtap0 -m fe:54:00:ed:29:ca -d 10.0.0.1 -s 512 -v -c 0
+cat /proc/net/pktgen/vtap0
 
 #netmap
 https://sgros-students.blogspot.kr/2016/05/installing-and-testing-netmap.html
@@ -67,3 +68,6 @@ tcpreplay netmap
 - ./autogen.sh
 - ./configure --with-netmap=/home/tu/netmap/LINUX --disable-local-libopts
 - install libtool if error
+
+
+https://thinkpads.org/software/2018/04/02/mitigating-the-mitigation-spectre-meltdown.html

@@ -36,10 +36,10 @@ class BPFCollector(object):
         self.flow_paths = {}
 
         # gauge
-        self.g_flow_pkt_cnt = Gauge('flow_pkt_cnt', 'flow packet count',
-            ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])   
-        self.g_flow_byte_cnt = Gauge('flow_byte_cnt', 'flow byte count',
-            ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
+        # self.g_flow_pkt_cnt = Gauge('flow_pkt_cnt', 'flow packet count',
+        #     ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])   
+        # self.g_flow_byte_cnt = Gauge('flow_byte_cnt', 'flow byte count',
+        #     ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
         self.g_flow_latency = Gauge('flow_latency', 'total flow latency',
             ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])       
         self.g_flow_hop_latency = Gauge('flow_hop_latency', 'per-hop latency of flow', 
@@ -130,8 +130,8 @@ class BPFCollector(object):
                              ("dst_port", ct.c_ushort),
                              ("ip_proto", ct.c_ushort),
                              
-                             ("pkt_cnt", ct.c_uint64),
-                             ("byte_cnt", ct.c_uint64),
+                             # ("pkt_cnt", ct.c_uint64),
+                             # ("byte_cnt", ct.c_uint64),
 
                              ("num_INT_hop", ct.c_ubyte),
 
@@ -166,19 +166,19 @@ class BPFCollector(object):
 
             #add new gauges
             if event.is_n_flow:
-                self.g_flow_pkt_cnt.labels(event.src_ip, event.dst_ip, \
-                                           event.src_port, event.dst_port, \
-                                           event.ip_proto) \
-                                   .set_function(self.get_flow_pkt_cnt(event.src_ip, \
-                                           event.dst_ip, event.src_port, \
-                                           event.dst_port, event.ip_proto))
+                # self.g_flow_pkt_cnt.labels(event.src_ip, event.dst_ip, \
+                #                            event.src_port, event.dst_port, \
+                #                            event.ip_proto) \
+                #                    .set_function(self.get_flow_pkt_cnt(event.src_ip, \
+                #                            event.dst_ip, event.src_port, \
+                #                            event.dst_port, event.ip_proto))
 
-                self.g_flow_byte_cnt.labels(event.src_ip, event.dst_ip, \
-                                           event.src_port, event.dst_port, \
-                                           event.ip_proto) \
-                                   .set_function(self.get_flow_byte_cnt(event.src_ip, \
-                                           event.dst_ip, event.src_port, \
-                                           event.dst_port, event.ip_proto))
+                # self.g_flow_byte_cnt.labels(event.src_ip, event.dst_ip, \
+                #                            event.src_port, event.dst_port, \
+                #                            event.ip_proto) \
+                #                    .set_function(self.get_flow_byte_cnt(event.src_ip, \
+                #                            event.dst_ip, event.src_port, \
+                #                            event.dst_port, event.ip_proto))
                 
                 self.g_flow_latency.labels(event.src_ip, event.dst_ip, \
                                            event.src_port, event.dst_port, \
@@ -263,7 +263,8 @@ class BPFCollector(object):
 if __name__ == "__main__":
 
     collector = BPFCollector()
-    collector.attach_iface("veth1")
+    iface = 'ens4'
+    collector.attach_iface(iface)
     collector.open_events()
     
     start_http_server(8000)
@@ -277,7 +278,7 @@ if __name__ == "__main__":
         pass
 
     finally:
-        collector.detach_iface("veth1")
+        collector.detach_iface(iface)
         print("Done")
 
     print "Exit"
