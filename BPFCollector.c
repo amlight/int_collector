@@ -22,10 +22,11 @@
 #define NULL16 0xFFFF
 
 // __packed__ size
+#define ETH_SIZE 14
 #define TCPHDR_SIZE 20
 #define UDPHDR_SIZE 8
 #define INT_SHIM_SIZE 4
-#define ETH_SIZE 14
+#define INT_TAIL_SIZE 4
 
 
 
@@ -243,9 +244,7 @@ int collector(struct xdp_md *ctx) {
     // return XDP_DROP;
 
     void* data_end = (void*)(long)ctx->data_end;
-    void* data = (void*)(long)ctx->data;
-    void* cursor = data;
-
+    void* cursor = (void*)(long)ctx->data;
 
     /*
         Parse outer: Ether->IP->UDP->TelemetryReport.
@@ -283,6 +282,7 @@ int collector(struct xdp_md *ctx) {
     struct ports_t *in_ports;
     CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);  
     
+    // TODO: TCP with option (not fixed header len)?
     u8 remain_size = (in_ip->protocol == IPPROTO_UDP)? 
                     (UDPHDR_SIZE - sizeof(*in_ports)) : 
                     (TCPHDR_SIZE - sizeof(*in_ports));
@@ -302,8 +302,8 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_data_t *INT_data;
 
-    static const struct flow_info_t empty_flow_info; // all init to zero
-    struct flow_info_t flow_info = empty_flow_info;
+    // static const struct flow_info_t empty_flow_info; // all init to zero
+    struct flow_info_t flow_info = {};
     flow_info.src_ip = ntohl(in_ip->saddr);
     flow_info.dst_ip = ntohl(in_ip->daddr);
     flow_info.src_port = in_ports->source;
@@ -312,36 +312,6 @@ int collector(struct xdp_md *ctx) {
 
     flow_info.num_INT_hop = INT_md_fix->totalHopCnt;
     flow_info.flow_sink_time = ntohl(tm_rp->ingressTimestamp);
-
-    // flow_info.pkt_cnt = 0;
-    // flow_info.byte_cnt = 0;
-
-    // #pragma unroll
-    // for (u8 i = 0; i < MAX_INT_HOP; i++) {
-    //     flow_info.sw_ids[i] = 0;
-    //     flow_info.in_port_ids[i] = 0;
-    //     flow_info.e_port_ids[i] = 0;
-    //     flow_info.hop_latencies[i] = 0;
-    //     flow_info.queue_ids[i] = 0;
-    //     flow_info.queue_occups[i] = 0;
-    //     flow_info.ingr_times[i] = 0;
-    //     flow_info.egr_times[i] = 0;
-    //     flow_info.queue_congests[i] = 0;
-    //     flow_info.tx_utilizes[i] = 0;
-    // }
-
-
-    // flow_info.is_n_flow = 0;
-    // flow_info.is_n_hop_latency = 0;
-    // flow_info.is_n_queue_occup = 0;
-    // flow_info.is_n_queue_congest = 0;
-    // flow_info.is_n_tx_utilize = 0;
-
-    // flow_info.is_path = 0;
-    // flow_info.is_hop_latency = 0;
-    // flow_info.is_queue_congest = 0;
-    // flow_info.is_queue_occup = 0;
-    // flow_info.is_tx_utilize = 0;
 
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
@@ -404,8 +374,8 @@ int collector(struct xdp_md *ctx) {
 
 
     // parse INT tail
-    struct INT_tail_t *INT_tail;
-    CURSOR_ADVANCE(INT_tail, cursor, sizeof(*INT_tail), data_end);
+    // struct INT_tail_t *INT_tail;
+    CURSOR_ADVANCE_NO_PARSE(cursor, INT_TAIL_SIZE, data_end);
 
 
     /*
@@ -486,6 +456,7 @@ int collector(struct xdp_md *ctx) {
         // flow_info.pkt_cnt = flow_info_p->pkt_cnt + 1;
         // flow_info.byte_cnt = flow_info_p->byte_cnt + ntohs(ip->tot_len);
     }
+UPDATE:
 
     if (is_update)
         tb_flow.update(&flow_id, &flow_info);

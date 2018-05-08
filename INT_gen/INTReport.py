@@ -48,30 +48,97 @@ class INT(Packet):
 
 if __name__ == "__main__":
 
-    p = Ether()/ \
-        IP(tos=0x17<<2)/ \
-        UDP(sport=5000, dport=54321)/ \
-        TelemetryReport(ingressTimestamp= 1524138290)/ \
-        Ether()/ \
-        IP(src="10.0.0.1", dst="10.0.0.2")/ \
-        UDP(sport=5000, dport=5000)/ \
-        INT(insCnt=8, totalHopCnt=3, ins=(1<<7 | 1 << 6 | 1<<5 | 1<<4 | 1 << 3 | 1<<2 | 1<<1 | 1)<<8,
-            INTMetadata=[1, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 11,
-                        13, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
-                        12, 22<<16| 32, 42, 52<<16| 37, 47, 1524234560, 92<<16| 9, 101],
-            originDSCP=14)
+    p_3sw_8d = []
+    p_6sw_8d = []
+    p_6sw_f_id = []
+    tcp_p_3sw_8d = []
+
+    for i in range(0,100):
+        p_3sw_8d.append(Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.1", dst="10.0.0.{0}".format(i))/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT(insCnt=8, totalHopCnt=3, ins=(1<<7 | 1 << 6 | 1<<5 | 1<<4 | 1 << 3 | 1<<2 | 1<<1 | 1)<<8,
+                INTMetadata=[1, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 11,
+                            13, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            12, 22<<16| 32, 42, 52<<16| 37, 47, 1524234560, 92<<16| 9, 12],
+                originDSCP=14)
+            )
+        p_6sw_8d.append(Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.109", dst="10.0.0.{0}".format(i))/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT(insCnt=8, totalHopCnt=6, ins=(1<<7 | 1 << 6 | 1<<5 | 1<<4 | 1 << 3 | 1<<2 | 1<<1 | 1)<<8,
+                INTMetadata=[1, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 11,
+                            2, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            3, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            4, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            5, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            12, 22<<16| 32, 42, 52<<16| 37, 47, 1524234560, 92<<16| 9, 12],
+                originDSCP=14)
+            )
+
+        p_6sw_f_id.append(Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.109", dst="10.0.0.{0}".format(i))/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT(insCnt=1, totalHopCnt=6, ins=(1<<7)<<8,
+                INTMetadata=[1,
+                            2, 
+                            3, 
+                            4, 
+                            5, 
+                            12],
+                originDSCP=14)
+            )
+
+        tcp_p_3sw_8d.append(Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.1", dst="10.0.0.{0}".format(i))/ \
+            TCP(sport=5000, dport=5000)/ \
+            INT(insCnt=8, totalHopCnt=3, ins=(1<<7 | 1 << 6 | 1<<5 | 1<<4 | 1 << 3 | 1<<2 | 1<<1 | 1)<<8,
+                INTMetadata=[1, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 11,
+                            13, 21<<16| 31, 41, 51<<16| 33, 43, 1524234560, 91<<16| 7, 8,
+                            12, 22<<16| 32, 42, 52<<16| 37, 47, 1524234560, 92<<16| 9, 12],
+                originDSCP=14)
+            )
+
 
     # p = INT(insCnt=2, totalHopCnt=3, ins=(1<<7 | 1<<5)<<8, INTMetadata=[1, 0x10, 2, 0x41, 4, 0x22])
     
-    # p = Ether()/ \
+    # p2 = Ether()/ \
     #     IP(tos=0x17<<2)/ \
     #     UDP(sport=5000, dport=54321)/ \
     #     TelemetryReport(ver=1, seqNumber=1234)
 
-    sendp(p, iface="veth0")
+    # p3 = Ether() / IP() / UDP(sport=5000, dport=54321) / Raw(['0'*(1280 - 46)])
+    # sendp(p1, iface="vtap0")
     # sendp(p, iface="veth0")
 
     # vars(p)
 
-    # pkts = (p * 10)
-    # wrpcap("int_rp.pcap", pkts)
+    # wrpcap("long_1280.pcap", p3*10)
+    # wrpcap("int_rp.pcap", p1, append=True)
+    # wrpcap("int_rp.pcap", p2, append=True)
+
+    wrpcap("tcp_3sw_8d_100f.pcap", tcp_p_3sw_8d)
+    # wrpcap("3sw_8d_100f.pcap", p_3sw_8d)
+    # wrpcap("6sw_8d_100f.pcap", p_6sw_8d)
+    # wrpcap("6sw_f_id_100f.pcap", p_6sw_f_id)
+
+    # pkts = (p1 * 10000)
+    # for i in range(100):
+    #   print "write: ", i
+    #   wrpcap("int_rp.pcap", pkts, append=True)
