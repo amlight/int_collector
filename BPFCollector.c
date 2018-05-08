@@ -33,10 +33,10 @@
 
 
 // TODO: set these values from use space
-#define HOP_LATENCY 50
-#define QUEUE_OCCUP 50
-#define QUEUE_CONGEST 50
-#define TX_UTILIZE 50
+#define HOP_LATENCY 6 // 64
+#define QUEUE_OCCUP 6
+#define QUEUE_CONGEST 6
+#define TX_UTILIZE 6
 #define TIME_GAP_W 100 //ns
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
@@ -440,7 +440,10 @@ int collector(struct xdp_md *ctx) {
                     flow_info.is_n_hop_latency |= 1 << i;
             }
 
-            if (is_hop_latencies && (flow_info.hop_latencies[i] > HOP_LATENCY)) {
+            if (unlikely(is_hop_latencies && 
+                    (flow_info.hop_latencies[i] >> HOP_LATENCY != 
+                    flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
+                
                 flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
             }
@@ -491,13 +494,16 @@ int collector(struct xdp_md *ctx) {
             if(unlikely(!egr_info_p)) {
                 flow_info.is_n_tx_utilize |= 1 << i;
                 is_update = 1; 
-            } else if (egr_info.egr_time > egr_info_p->egr_time + TIME_GAP_W) {
-                is_update = 1;
-            }
+            } 
+            else {
+                if (egr_info.egr_time > egr_info_p->egr_time + TIME_GAP_W) {
+                    is_update = 1;
+                }
 
-            if (unlikely(egr_info.tx_utilize > TX_UTILIZE)) {
-                flow_info.is_tx_utilize |= 1 << i;
-                is_update = 1;
+                if (unlikely(egr_info.tx_utilize >> TX_UTILIZE != egr_info_p->tx_utilize >> TX_UTILIZE)) {
+                    flow_info.is_tx_utilize |= 1 << i;
+                    is_update = 1;
+                }
             }
 
             if (is_update)
@@ -541,17 +547,23 @@ int collector(struct xdp_md *ctx) {
 
                 is_update = 1;
 
-            } else if (queue_info.q_time > queue_info_p->q_time + TIME_GAP_W) {
-                is_update = 1;
-            }
+            } else {
+                if (queue_info.q_time > queue_info_p->q_time + TIME_GAP_W) {
+                    is_update = 1;
+                }
 
-            if (unlikely(is_queue_occups & (queue_info.occup > QUEUE_OCCUP))) {
-                flow_info.is_queue_occup |= 1 << i;
-                is_update = 1;
-            }
-            if (unlikely(is_queue_congests & (queue_info.congest > QUEUE_CONGEST))) {
-                flow_info.is_queue_congest |= 1 << i;
-                is_update = 1;
+                if (unlikely(is_queue_occups & 
+                    (queue_info.occup >> QUEUE_OCCUP != queue_info_p->occup >> QUEUE_OCCUP))) {
+                    
+                    flow_info.is_queue_occup |= 1 << i;
+                    is_update = 1;
+                }
+                if (unlikely(is_queue_congests & 
+                    (queue_info.congest >> QUEUE_CONGEST != queue_info_p->congest >> QUEUE_CONGEST))) {
+                    
+                    flow_info.is_queue_congest |= 1 << i;
+                    is_update = 1;
+                }
             }
 
             if (is_update)
