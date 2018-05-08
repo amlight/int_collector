@@ -13,7 +13,7 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 4
+#define MAX_INT_HOP 6
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -221,11 +221,11 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
-BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
+BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 10240);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
-BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
-BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 256);
+BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 2560);
+BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 2560);
 // BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
 
 

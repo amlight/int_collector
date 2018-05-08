@@ -21,7 +21,7 @@ class InDBCollector(object):
     def __init__(self):
         super(InDBCollector, self).__init__()
 
-        self.MAX_INT_HOP = 4
+        self.MAX_INT_HOP = 6
 
         self.ifaces = set()
 
@@ -110,7 +110,7 @@ class InDBCollector(object):
             
             event_data = []
             
-            if event.is_n_flow:
+            if event.is_n_flow or event.is_path:
                 event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
                                                     str(IPv4Address(event.src_ip)),
                                                     event.src_port,
@@ -125,26 +125,28 @@ class InDBCollector(object):
                                     }
                                 })
 
-                if event.is_n_hop_latency:
-                    for i in range(0, event.num_INT_hop):
-                        if ((event.is_n_hop_latency >> i) & 0x01):
-                            event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
-                                                                str(IPv4Address(event.src_ip)),
-                                                                event.src_port,
-                                                                str(IPv4Address(event.dst_ip)),
-                                                                event.dst_port,
-                                                                event.ip_proto,
-                                                                event.sw_ids[i]),
-                                                "time": event.egr_times[i]*1000000000,
-                                                "fields": {
-                                                    "value" : event.hop_latencies[i]
-                                                }
-                                            })
-
-
-            if event.is_n_tx_utilize:
+            is_hop_latency = event.is_n_hop_latency | event.is_hop_latency
+            if is_hop_latency:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_tx_utilize >> i) & 0x01):
+                    if ((is_hop_latency >> i) & 0x01):
+                        event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
+                                                            str(IPv4Address(event.src_ip)),
+                                                            event.src_port,
+                                                            str(IPv4Address(event.dst_ip)),
+                                                            event.dst_port,
+                                                            event.ip_proto,
+                                                            event.sw_ids[i]),
+                                            "time": event.egr_times[i]*1000000000,
+                                            "fields": {
+                                                "value" : event.hop_latencies[i]
+                                            }
+                                        })
+
+
+            is_tx_utilize = event.is_n_tx_utilize | event.is_tx_utilize
+            if is_tx_utilize:
+                for i in range(0, event.num_INT_hop):
+                    if ((is_tx_utilize >> i) & 0x01):
                         event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
                                                            event.sw_ids[i], event.e_port_ids[i]),
                                             "time": event.egr_times[i]*1000000000,
@@ -153,9 +155,10 @@ class InDBCollector(object):
                                             }
                                         })
 
-            if event.is_n_queue_occup:
+            is_queue_occup = event.is_n_queue_occup | event.is_queue_occup
+            if is_queue_occup:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_queue_occup >> i) & 0x01):
+                    if ((is_queue_occup >> i) & 0x01):
                         event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
                                             "time": event.egr_times[i]*1000000000,
@@ -164,9 +167,10 @@ class InDBCollector(object):
                                             }
                                         })
 
-            if event.is_n_queue_congest:
+            is_queue_congest = event.is_n_queue_congest | event.is_queue_congest
+            if is_queue_congest:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_queue_congest >> i) & 0x01):
+                    if ((is_queue_congest >> i) & 0x01):
                         event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
                                             "time": event.egr_times[i]*1000000000,
@@ -214,6 +218,7 @@ class InDBCollector(object):
                             "fields": {
                                 # "pkt_cnt"  : flow_info.pkt_cnt,
                                 # "byte_cnt" : flow_info.byte_cnt,
+                                # dont need path here. if there is path change, it should
                                 "flow_latency" : flow_info.flow_latency
                             }
                         })
