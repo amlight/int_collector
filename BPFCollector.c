@@ -13,7 +13,7 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 6
+#define MAX_INT_HOP 4
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -162,8 +162,6 @@ struct egr_id_t {
 
 struct egr_info_t {
 	u32 tx_utilize;
-	u8 utilize_ex;
-
     u32 egr_time;
 };
 
@@ -174,11 +172,7 @@ struct queue_id_t {
 
 struct queue_info_t {
 	u16 occup;
-	u8 occup_ex;
-
 	u16 congest;
-    u8 congest_ex;
-
     u32 q_time;
 };
 

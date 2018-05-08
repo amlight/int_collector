@@ -21,7 +21,7 @@ class InDBCollector(object):
     def __init__(self):
         super(InDBCollector, self).__init__()
 
-        self.MAX_INT_HOP = 6
+        self.MAX_INT_HOP = 4
 
         self.ifaces = set()
 
