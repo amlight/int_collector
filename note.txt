@@ -48,7 +48,12 @@ https://www.slideshare.net/lcplcp1/xdp-and-ebpfmaps
 #log 
 /var/log/libvirt/qemu/<domain>.log
 #vrish edit
-<driver name='vhost' queues='2'/> 
+<driver name='vhost' queues='2' rx_queue_size='1024' tx_queue_size='1024'/>
+OR: but above is better (virtual offloading is on, so less CPU usage in guest)
+<driver name='vhost' queues='2' rx_queue_size='1024' tx_queue_size='1024'>
+        <host tso4='off' tso6='off' ecn='off' ufo='off'/> 
+        <guest tso4='off' tso6='off' ecn='off' ufo='off'/> 
+      </driver>
 
 #pktgen
 ./pktgen.sh -i vtap0 -m fe:54:00:ed:29:ca -d 10.0.0.1 -s 512 -v -c 0

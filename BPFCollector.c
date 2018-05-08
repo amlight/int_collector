@@ -13,13 +13,22 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 4
+#define MAX_INT_HOP 6
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
 #define BROADCAST_MAC 0xFFFFFFFFFFFF
 #define NULL32 0xFFFFFFFF
 #define NULL16 0xFFFF
+
+// __packed__ size
+#define TCPHDR_SIZE 20
+#define UDPHDR_SIZE 8
+#define INT_SHIM_SIZE 4
+#define ETH_SIZE 14
+
+
+
 
 
 // TODO: set these values from use space
@@ -30,11 +39,20 @@
 #define TIME_GAP_W 100 //ns
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
-	({  _target = _cursor; _cursor += _len; \
+    ({  _target = _cursor; _cursor += _len; \
+        if(unlikely(_cursor > _data_end)) return XDP_DROP; })
+
+#define CURSOR_ADVANCE_NO_PARSE(_cursor, _len, _data_end) \
+	({  _cursor += _len; \
   		if(unlikely(_cursor > _data_end)) return XDP_DROP; })
 
 //--------------------------------------------------------------------
 // Protocols
+    struct ports_t {
+    u16 source;
+    u16 dest;
+} __attribute__((packed));
+
 struct eth_tp {
     u64 dst:48;
     u64 src:48;
@@ -208,7 +226,7 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
-BPF_TABLE("hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
+BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1024);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
 BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 256);
@@ -253,21 +271,24 @@ int collector(struct xdp_md *ctx) {
 
 
 	/*
-        Parse Inner: Ether->IP->UDP->INT. 
+        Parse Inner: Ether->IP->UDP/TCP->INT. 
         we only consider Telemetry report with INT
 	*/
 
-    struct eth_tp *in_eth;
-    CURSOR_ADVANCE(in_eth, cursor, sizeof(*in_eth), data_end);
+    CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
 
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);    
 
-    struct udphdr *in_udp;
-    CURSOR_ADVANCE(in_udp, cursor, sizeof(*in_udp), data_end);
-
-    struct INT_shim_t *INT_shim;
-    CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
+    struct ports_t *in_ports;
+    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);  
+    
+    u8 remain_size = (in_ip->protocol == IPPROTO_UDP)? 
+                    (UDPHDR_SIZE - sizeof(*in_ports)) : 
+                    (TCPHDR_SIZE - sizeof(*in_ports));
+    CURSOR_ADVANCE_NO_PARSE(cursor, remain_size, data_end);
+        
+    CURSOR_ADVANCE_NO_PARSE(cursor, INT_SHIM_SIZE, data_end);
 
     struct INT_md_fix_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
@@ -285,8 +306,8 @@ int collector(struct xdp_md *ctx) {
     struct flow_info_t flow_info = empty_flow_info;
     flow_info.src_ip = ntohl(in_ip->saddr);
     flow_info.dst_ip = ntohl(in_ip->daddr);
-    flow_info.src_port = ntohs(in_udp->source);
-    flow_info.dst_port = ntohs(in_udp->dest);
+    flow_info.src_port = in_ports->source;
+    flow_info.dst_port = in_ports->dest;
     flow_info.ip_proto = in_ip->protocol;
 
     flow_info.num_INT_hop = INT_md_fix->totalHopCnt;
