@@ -111,6 +111,7 @@ class InDBCollector(object):
             event_data = []
             
             if event.is_n_flow or event.is_path:
+                path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
                 event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
                                                     str(IPv4Address(event.src_ip)),
                                                     event.src_port,
@@ -121,7 +122,8 @@ class InDBCollector(object):
                                     "fields": {
                                         # "pkt_cnt"  : event.pkt_cnt,
                                         # "byte_cnt" : event.byte_cnt,
-                                        "flow_latency" : event.flow_latency
+                                        "flow_latency" : event.flow_latency,
+                                        "path": path_str
                                     }
                                 })
 
@@ -208,6 +210,7 @@ class InDBCollector(object):
         data = []
 
         for (flow_id, flow_info) in self.tb_flow.items():
+            path_str = ":".join(str(flow_info.sw_ids[i]) for i in reversed(range(0, flow_info.num_INT_hop)))
             data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
                                                     str(IPv4Address(flow_id.src_ip)),
                                                     flow_id.src_port,
@@ -219,7 +222,8 @@ class InDBCollector(object):
                                 # "pkt_cnt"  : flow_info.pkt_cnt,
                                 # "byte_cnt" : flow_info.byte_cnt,
                                 # dont need path here. if there is path change, it should
-                                "flow_latency" : flow_info.flow_latency
+                                "flow_latency" : flow_info.flow_latency,
+                                "path" : path_str
                             }
                         })
 
