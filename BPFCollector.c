@@ -302,16 +302,16 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_data_t *INT_data;
 
-    // static const struct flow_info_t empty_flow_info; // all init to zero
-    struct flow_info_t flow_info = {};
-    flow_info.src_ip = ntohl(in_ip->saddr);
-    flow_info.dst_ip = ntohl(in_ip->daddr);
-    flow_info.src_port = in_ports->source;
-    flow_info.dst_port = in_ports->dest;
-    flow_info.ip_proto = in_ip->protocol;
+    struct flow_info_t flow_info = {
+        .src_ip = ntohl(in_ip->saddr),
+        .dst_ip = ntohl(in_ip->daddr),
+        .src_port = in_ports->source,
+        .dst_port = in_ports->dest,
+        .ip_proto = in_ip->protocol,
 
-    flow_info.num_INT_hop = INT_md_fix->totalHopCnt;
-    flow_info.flow_sink_time = ntohl(tm_rp->ingressTimestamp);
+        .num_INT_hop = INT_md_fix->totalHopCnt,
+        .flow_sink_time = ntohl(tm_rp->ingressTimestamp)
+    };
 
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
@@ -456,7 +456,6 @@ int collector(struct xdp_md *ctx) {
         // flow_info.pkt_cnt = flow_info_p->pkt_cnt + 1;
         // flow_info.byte_cnt = flow_info_p->byte_cnt + ntohs(ip->tot_len);
     }
-UPDATE:
 
     if (is_update)
         tb_flow.update(&flow_id, &flow_info);
