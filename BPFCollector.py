@@ -24,7 +24,8 @@ class BPFCollector(object):
         self.ifaces = set()
 
         #load eBPF program
-        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0)
+        self.bpf_collector = BPF(src_file="BPFCollector.c",
+          cflags=["-w", "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP], debug=0)
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
     
         # get all the info table

@@ -13,7 +13,7 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP 6
+#define MAX_INT_HOP _MAX_INT_HOP // get from cflags
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
