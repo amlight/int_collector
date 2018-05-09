@@ -22,12 +22,15 @@ class InDBCollector(object):
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = 6
+        self.SERVER_MODE = "INFLUXDB"
 
         self.ifaces = set()
 
         #load eBPF program
-        self.bpf_collector = BPF(src_file="BPFCollector.c", 
-            cflags=["-w", "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP], debug=0)
+        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
+            cflags=["-w", 
+                    "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
+                    "-D_SERVER_MODE=%s" % self.SERVER_MODE])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
         # get all the info table
@@ -93,10 +96,10 @@ class InDBCollector(object):
                              ("flow_sink_time", ct.c_uint32),
 
                              ("is_n_flow", ct.c_ubyte),
-                             ("is_n_hop_latency", ct.c_ubyte),
-                             ("is_n_queue_occup", ct.c_ubyte),
-                             ("is_n_queue_congest", ct.c_ubyte),
-                             ("is_n_tx_utilize", ct.c_ubyte),
+                             # ("is_n_hop_latency", ct.c_ubyte),
+                             # ("is_n_queue_occup", ct.c_ubyte),
+                             # ("is_n_queue_congest", ct.c_ubyte),
+                             # ("is_n_tx_utilize", ct.c_ubyte),
 
                              ("is_path", ct.c_ubyte),
                              ("is_hop_latency", ct.c_ubyte),
@@ -128,8 +131,7 @@ class InDBCollector(object):
                                     }
                                 })
 
-            is_hop_latency = event.is_n_hop_latency | event.is_hop_latency
-            if is_hop_latency:
+            if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
                     if ((is_hop_latency >> i) & 0x01):
                         event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
@@ -146,8 +148,7 @@ class InDBCollector(object):
                                         })
 
 
-            is_tx_utilize = event.is_n_tx_utilize | event.is_tx_utilize
-            if is_tx_utilize:
+            if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
                     if ((is_tx_utilize >> i) & 0x01):
                         event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
@@ -158,8 +159,7 @@ class InDBCollector(object):
                                             }
                                         })
 
-            is_queue_occup = event.is_n_queue_occup | event.is_queue_occup
-            if is_queue_occup:
+            if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if ((is_queue_occup >> i) & 0x01):
                         event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
@@ -170,8 +170,7 @@ class InDBCollector(object):
                                             }
                                         })
 
-            is_queue_congest = event.is_n_queue_congest | event.is_queue_congest
-            if is_queue_congest:
+            if event.is_queue_congest:
                 for i in range(0, event.num_INT_hop):
                     if ((is_queue_congest >> i) & 0x01):
                         event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(

@@ -13,7 +13,9 @@
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
 
-#define MAX_INT_HOP _MAX_INT_HOP // get from cflags
+// get from cflags
+#define MAX_INT_HOP _MAX_INT_HOP
+#define _SERVER_MODE
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -207,16 +209,21 @@ struct flow_info_t {
     u32 flow_sink_time;
 
     u8 is_n_flow;
+    
+#ifdef PROMETHEUS
     u8 is_n_hop_latency;
     u8 is_n_queue_occup;
     u8 is_n_queue_congest;
     u8 is_n_tx_utilize;
-
+#endif
+    
+#ifdef INFLUXDB
     u8 is_path;
     u8 is_hop_latency;
     u8 is_queue_occup;
     u8 is_queue_congest;
     u8 is_tx_utilize;
+#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -401,6 +408,7 @@ int collector(struct xdp_md *ctx) {
         flow_info.is_n_flow = 1;
         is_update = 1;
 
+#ifdef PROMETHEUS
         switch (INT_md_fix->totalHopCnt) {
             case 1: flow_info.is_n_hop_latency = 0x01; break;
             case 2: flow_info.is_n_hop_latency = 0x03; break;
@@ -412,6 +420,20 @@ int collector(struct xdp_md *ctx) {
             case 8: flow_info.is_n_hop_latency = 0xff; break;
             default: break;
         }
+#endif
+#ifdef INFLUXDB
+        switch (INT_md_fix->totalHopCnt) {
+            case 1: flow_info.is_hop_latency = 0x01; break;
+            case 2: flow_info.is_hop_latency = 0x03; break;
+            case 3: flow_info.is_hop_latency = 0x07; break;
+            case 4: flow_info.is_hop_latency = 0x0f; break;
+            case 5: flow_info.is_hop_latency = 0x1f; break;
+            case 6: flow_info.is_hop_latency = 0x3f; break;
+            case 7: flow_info.is_hop_latency = 0x7f; break;
+            case 8: flow_info.is_hop_latency = 0xff; break;
+            default: break;
+        }
+#endif
 
         // flow_info.pkt_cnt++;
         // flow_info.byte_cnt += ntohs(ip->tot_len);
@@ -428,19 +450,29 @@ int collector(struct xdp_md *ctx) {
             
 
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
-                flow_info.is_path = 1;
                 is_update = 1;
-                if (is_hop_latencies)
+#ifdef INFLUXDB
+                flow_info.is_path = 1;
+#endif
+                if (is_hop_latencies) {
+#ifdef PROMETHEUS
                     flow_info.is_n_hop_latency |= 1 << i;
+#endif
+#ifdef INFLUXDB
+                    flow_info.is_hop_latency |= 1 << i;
+#endif
+                }
             }
 
+#ifdef INFLUXDB
             if (unlikely(is_hop_latencies && 
                     (flow_info.hop_latencies[i] >> HOP_LATENCY != 
                     flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
                 
-                flow_info.is_hop_latency |= 1 << i;
+                    flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
             }
+#endif
 
             // no need for the final round
             if (i < MAX_INT_HOP - 1) {      
@@ -486,7 +518,13 @@ int collector(struct xdp_md *ctx) {
 
             egr_info_p = tb_egr.lookup(&egr_id);
             if(unlikely(!egr_info_p)) {
+
+#ifdef PROMETHEUS
                 flow_info.is_n_tx_utilize |= 1 << i;
+#endif
+#ifdef INFLUXDB
+                flow_info.is_tx_utilize |= 1 << i;
+#endif
                 is_update = 1; 
             } 
             else {
@@ -494,10 +532,12 @@ int collector(struct xdp_md *ctx) {
                     is_update = 1;
                 }
 
+#ifdef INFLUXDB
                 if (unlikely(egr_info.tx_utilize >> TX_UTILIZE != egr_info_p->tx_utilize >> TX_UTILIZE)) {
                     flow_info.is_tx_utilize |= 1 << i;
                     is_update = 1;
                 }
+#endif
             }
 
             if (is_update)
@@ -534,10 +574,19 @@ int collector(struct xdp_md *ctx) {
 
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
+
+#ifdef PROMETHEUS
                 if (is_queue_occups)
                     flow_info.is_n_queue_occup |= 1 << i;
                 if (is_queue_congests)
                     flow_info.is_n_queue_congest |= 1 << i;
+#endif
+#ifdef INFLUXDB
+                if (is_queue_occups)
+                    flow_info.is_queue_occup |= 1 << i;
+                if (is_queue_congests)
+                    flow_info.is_queue_congest |= 1 << i;
+#endif
 
                 is_update = 1;
 
@@ -546,6 +595,7 @@ int collector(struct xdp_md *ctx) {
                     is_update = 1;
                 }
 
+#ifdef PROMETHEUS
                 if (unlikely(is_queue_occups & 
                     (queue_info.occup >> QUEUE_OCCUP != queue_info_p->occup >> QUEUE_OCCUP))) {
                     
@@ -558,6 +608,7 @@ int collector(struct xdp_md *ctx) {
                     flow_info.is_queue_congest |= 1 << i;
                     is_update = 1;
                 }
+#endif
             }
 
             if (is_update)
@@ -569,10 +620,17 @@ int collector(struct xdp_md *ctx) {
 
 
     // submit event info to user space
-    if (unlikely(flow_info.is_n_flow | flow_info.is_n_hop_latency |
-        flow_info.is_n_queue_occup | flow_info.is_n_queue_congest | 
-        flow_info.is_n_tx_utilize | flow_info.is_path | flow_info.is_hop_latency | 
-        flow_info.is_queue_occup | flow_info.is_queue_congest | flow_info.is_tx_utilize)
+    if (unlikely(flow_info.is_n_flow
+#ifdef PROMETHEUS
+        | flow_info.is_n_hop_latency | flow_info.is_n_queue_occup |
+        flow_info.is_n_queue_congest | flow_info.is_n_tx_utilize
+#endif
+#ifdef INFLUXDB
+        | flow_info.is_path | flow_info.is_hop_latency |
+        flow_info.is_queue_occup | flow_info.is_queue_congest |
+        flow_info.is_tx_utilize
+#endif
+        )
     )
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
 

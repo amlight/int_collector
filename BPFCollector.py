@@ -19,13 +19,16 @@ class BPFCollector(object):
     def __init__(self):
         super(BPFCollector, self).__init__()
 
-        self.MAX_INT_HOP = 6
+        self.MAX_INT_HOP = 4
+        self.SERVER_MODE = "PROMETHEUS"
 
         self.ifaces = set()
 
         #load eBPF program
-        self.bpf_collector = BPF(src_file="BPFCollector.c",
-          cflags=["-w", "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP], debug=0)
+        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=2,
+            cflags=["-w", 
+                    "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
+                    "-D_SERVER_MODE=%s" % self.SERVER_MODE])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
     
         # get all the info table
@@ -154,13 +157,13 @@ class BPFCollector(object):
                              ("is_n_hop_latency", ct.c_ubyte),
                              ("is_n_queue_occup", ct.c_ubyte),
                              ("is_n_queue_congest", ct.c_ubyte),
-                             ("is_n_tx_utilize", ct.c_ubyte),
+                             ("is_n_tx_utilize", ct.c_ubyte)
 
-                             ("is_path", ct.c_ubyte),
-                             ("is_hop_latency", ct.c_ubyte),
-                             ("is_queue_occup", ct.c_ubyte),
-                             ("is_queue_congest", ct.c_ubyte),
-                             ("is_tx_utilize", ct.c_ubyte)
+                             # ("is_path", ct.c_ubyte),
+                             # ("is_hop_latency", ct.c_ubyte),
+                             # ("is_queue_occup", ct.c_ubyte),
+                             # ("is_queue_congest", ct.c_ubyte),
+                             # ("is_tx_utilize", ct.c_ubyte)
                              ]
 
             event = ct.cast(data, ct.POINTER(Event)).contents
