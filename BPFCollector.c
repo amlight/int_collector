@@ -495,8 +495,6 @@ int collector(struct xdp_md *ctx) {
         Egress info
     */
 
-    is_update = 0;
-
     struct egr_info_t *egr_info_p;
     struct egr_id_t egr_id = {};
     struct egr_info_t egr_info = {};
