@@ -19,13 +19,13 @@ class BPFCollector(object):
     def __init__(self):
         super(BPFCollector, self).__init__()
 
-        self.MAX_INT_HOP = 4
+        self.MAX_INT_HOP = 6
         self.SERVER_MODE = "PROMETHEUS"
 
         self.ifaces = set()
 
         #load eBPF program
-        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=2,
+        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
             cflags=["-w", 
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
                     "-D_SERVER_MODE=%s" % self.SERVER_MODE])

@@ -469,7 +469,7 @@ int collector(struct xdp_md *ctx) {
                     (flow_info.hop_latencies[i] >> HOP_LATENCY != 
                     flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
                 
-                    flow_info.is_hop_latency |= 1 << i;
+                flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
             }
 #endif
@@ -497,7 +497,7 @@ int collector(struct xdp_md *ctx) {
 
     struct egr_info_t *egr_info_p;
     struct egr_id_t egr_id = {};
-    struct egr_info_t egr_info = {};
+    struct egr_info_t egr_info;
 
     num_INT_hop = INT_md_fix->totalHopCnt;
     #pragma unroll
@@ -552,7 +552,7 @@ int collector(struct xdp_md *ctx) {
     
     struct queue_info_t *queue_info_p;
     struct queue_id_t queue_id = {};
-    struct queue_info_t queue_info = {};
+    struct queue_info_t queue_info;
 
     num_INT_hop = INT_md_fix->totalHopCnt;
     #pragma unroll

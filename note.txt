@@ -74,5 +74,8 @@ tcpreplay netmap
 - ./configure --with-netmap=/home/tu/netmap/LINUX --disable-local-libopts
 - install libtool if error
 
-
+# disable spectre and meltdown patch
 https://thinkpads.org/software/2018/04/02/mitigating-the-mitigation-spectre-meltdown.html
+
+# why use vhost
+https://www.linux-kvm.org/images/8/82/Vhost_virtio_net_need_for_speed_2.odp
