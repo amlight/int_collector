@@ -13,6 +13,7 @@ import multiprocessing
 import sys
 # import netifaces
 # import os
+import argparse
 import ctypes as ct
 
 class InDBCollector(object):
@@ -65,6 +66,11 @@ class InDBCollector(object):
             return
         self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces.remove(iface)
+
+    def detach_all_iface(self):
+        for iface in self.ifaces:
+            self.bpf_collector.remove_xdp(iface, 0)
+        self.ifaces = set()
 
         
     def open_events(self):
@@ -277,9 +283,14 @@ class InDBCollector(object):
 #---------------------------------------------------------------------------
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description='InfluxBD client.')
+    parser.add_argument("ifaces", nargs='+',
+        help="List of ifaces to receive INT reports")
+    args = parser.parse_args()
+
     collector = InDBCollector()
-    iface = "ens4"
-    collector.attach_iface(iface)
+    for iface in args.ifaces:
+        collector.attach_iface(iface)
 
     # clear all old dbs. For easy testing
     for db in collector.client.get_list_database():
@@ -330,7 +341,7 @@ if __name__ == "__main__":
         # print "queue_occup: ", collector.client.query(query="select * from queue_occup"), "\n"
         # print "queue_congest: ", collector.client.query(query="select * from queue_congest"), "\n"
 
-        collector.detach_iface(iface)
+        collector.detach_all_iface()
         print("Done")
 
     print "Exit"

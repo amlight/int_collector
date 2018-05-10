@@ -11,6 +11,7 @@ import time
 # import os
 # import json
 # import ipaddress
+import argparse
 import ctypes as ct
 
 class BPFCollector(object):
@@ -68,6 +69,11 @@ class BPFCollector(object):
             return
         self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces.remove(iface)
+
+    def detach_all_iface(self):
+        for iface in self.ifaces:
+            self.bpf_collector.remove_xdp(iface, 0)
+        self.ifaces = set()
 
 
     # invalid key raises error. However, invalid key is prevented by prometheus
@@ -266,9 +272,15 @@ class BPFCollector(object):
 #---------------------------------------------------------------------------
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description='Prometheus client.')
+    parser.add_argument("ifaces", nargs='+',
+        help="List of ifaces to receive INT reports")
+    args = parser.parse_args()
+
     collector = BPFCollector()
-    iface = 'ens4'
-    collector.attach_iface(iface)
+    for iface in args.ifaces:
+        collector.attach_iface(iface)
+
     collector.open_events()
     
     start_http_server(8000)
@@ -282,7 +294,7 @@ if __name__ == "__main__":
         pass
 
     finally:
-        collector.detach_iface(iface)
+        collector.detach_all_iface()
         print("Done")
 
     print "Exit"
