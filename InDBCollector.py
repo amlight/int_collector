@@ -139,7 +139,7 @@ class InDBCollector(object):
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
-                    if ((is_hop_latency >> i) & 0x01):
+                    if ((event.is_hop_latency >> i) & 0x01):
                         event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
                                                             str(IPv4Address(event.src_ip)),
                                                             event.src_port,
@@ -156,7 +156,7 @@ class InDBCollector(object):
 
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
-                    if ((is_tx_utilize >> i) & 0x01):
+                    if ((event.is_tx_utilize >> i) & 0x01):
                         event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
                                                            event.sw_ids[i], event.e_port_ids[i]),
                                             "time": event.egr_times[i]*1000000000,
@@ -167,7 +167,7 @@ class InDBCollector(object):
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
-                    if ((is_queue_occup >> i) & 0x01):
+                    if ((event.is_queue_occup >> i) & 0x01):
                         event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
                                             "time": event.egr_times[i]*1000000000,
@@ -178,7 +178,7 @@ class InDBCollector(object):
 
             if event.is_queue_congest:
                 for i in range(0, event.num_INT_hop):
-                    if ((is_queue_congest >> i) & 0x01):
+                    if ((event.is_queue_congest >> i) & 0x01):
                         event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
                                             "time": event.egr_times[i]*1000000000,

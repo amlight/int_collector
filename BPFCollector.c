@@ -14,8 +14,21 @@
 // #define IPPROTO_TCP 6
 
 // get from cflags
+// detail: https://stackoverflow.com/questions/25254043/is-it-
+// possible-to-compare-ifdef-values-for-conditional-use
 #define MAX_INT_HOP _MAX_INT_HOP
-#define _SERVER_MODE
+#define SERVER_MODE _SERVER_MODE
+
+#define PROMETHEUS 1
+#define INFLUXDB 2
+
+#if SERVER_MODE == INFLUXDB
+    #define USE_INFLUXDB
+#endif
+
+#if SERVER_MODE == PROMETHEUS
+    #define USE_PROMETHEUS
+#endif
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -210,14 +223,14 @@ struct flow_info_t {
 
     u8 is_n_flow;
     
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
     u8 is_n_hop_latency;
     u8 is_n_queue_occup;
     u8 is_n_queue_congest;
     u8 is_n_tx_utilize;
 #endif
     
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
     u8 is_path;
     u8 is_hop_latency;
     u8 is_queue_occup;
@@ -408,7 +421,7 @@ int collector(struct xdp_md *ctx) {
         flow_info.is_n_flow = 1;
         is_update = 1;
 
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
         switch (INT_md_fix->totalHopCnt) {
             case 1: flow_info.is_n_hop_latency = 0x01; break;
             case 2: flow_info.is_n_hop_latency = 0x03; break;
@@ -421,7 +434,7 @@ int collector(struct xdp_md *ctx) {
             default: break;
         }
 #endif
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
         switch (INT_md_fix->totalHopCnt) {
             case 1: flow_info.is_hop_latency = 0x01; break;
             case 2: flow_info.is_hop_latency = 0x03; break;
@@ -451,20 +464,20 @@ int collector(struct xdp_md *ctx) {
 
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
                 flow_info.is_path = 1;
 #endif
                 if (is_hop_latencies) {
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
                     flow_info.is_n_hop_latency |= 1 << i;
 #endif
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
                     flow_info.is_hop_latency |= 1 << i;
 #endif
                 }
             }
 
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
             if (unlikely(is_hop_latencies && 
                     (flow_info.hop_latencies[i] >> HOP_LATENCY != 
                     flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
@@ -517,10 +530,10 @@ int collector(struct xdp_md *ctx) {
             egr_info_p = tb_egr.lookup(&egr_id);
             if(unlikely(!egr_info_p)) {
 
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
                 flow_info.is_n_tx_utilize |= 1 << i;
 #endif
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
                 flow_info.is_tx_utilize |= 1 << i;
 #endif
                 is_update = 1; 
@@ -530,7 +543,7 @@ int collector(struct xdp_md *ctx) {
                     is_update = 1;
                 }
 
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
                 if (unlikely(egr_info.tx_utilize >> TX_UTILIZE != egr_info_p->tx_utilize >> TX_UTILIZE)) {
                     flow_info.is_tx_utilize |= 1 << i;
                     is_update = 1;
@@ -573,13 +586,13 @@ int collector(struct xdp_md *ctx) {
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
 
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
                 if (is_queue_occups)
                     flow_info.is_n_queue_occup |= 1 << i;
                 if (is_queue_congests)
                     flow_info.is_n_queue_congest |= 1 << i;
 #endif
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
                 if (is_queue_occups)
                     flow_info.is_queue_occup |= 1 << i;
                 if (is_queue_congests)
@@ -593,7 +606,7 @@ int collector(struct xdp_md *ctx) {
                     is_update = 1;
                 }
 
-#ifdef PROMETHEUS
+#ifdef USE_INFLUXDB
                 if (unlikely(is_queue_occups & 
                     (queue_info.occup >> QUEUE_OCCUP != queue_info_p->occup >> QUEUE_OCCUP))) {
                     
@@ -619,11 +632,11 @@ int collector(struct xdp_md *ctx) {
 
     // submit event info to user space
     if (unlikely(flow_info.is_n_flow
-#ifdef PROMETHEUS
+#ifdef USE_PROMETHEUS
         | flow_info.is_n_hop_latency | flow_info.is_n_queue_occup |
         flow_info.is_n_queue_congest | flow_info.is_n_tx_utilize
 #endif
-#ifdef INFLUXDB
+#ifdef USE_INFLUXDB
         | flow_info.is_path | flow_info.is_hop_latency |
         flow_info.is_queue_occup | flow_info.is_queue_congest |
         flow_info.is_tx_utilize
