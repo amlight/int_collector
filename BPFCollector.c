@@ -421,32 +421,34 @@ int collector(struct xdp_md *ctx) {
         flow_info.is_n_flow = 1;
         is_update = 1;
 
+        if (is_hop_latencies) {
 #ifdef USE_PROMETHEUS
-        switch (INT_md_fix->totalHopCnt) {
-            case 1: flow_info.is_n_hop_latency = 0x01; break;
-            case 2: flow_info.is_n_hop_latency = 0x03; break;
-            case 3: flow_info.is_n_hop_latency = 0x07; break;
-            case 4: flow_info.is_n_hop_latency = 0x0f; break;
-            case 5: flow_info.is_n_hop_latency = 0x1f; break;
-            case 6: flow_info.is_n_hop_latency = 0x3f; break;
-            case 7: flow_info.is_n_hop_latency = 0x7f; break;
-            case 8: flow_info.is_n_hop_latency = 0xff; break;
-            default: break;
-        }
+            switch (INT_md_fix->totalHopCnt) {
+                case 1: flow_info.is_n_hop_latency = 0x01; break;
+                case 2: flow_info.is_n_hop_latency = 0x03; break;
+                case 3: flow_info.is_n_hop_latency = 0x07; break;
+                case 4: flow_info.is_n_hop_latency = 0x0f; break;
+                case 5: flow_info.is_n_hop_latency = 0x1f; break;
+                case 6: flow_info.is_n_hop_latency = 0x3f; break;
+                case 7: flow_info.is_n_hop_latency = 0x7f; break;
+                case 8: flow_info.is_n_hop_latency = 0xff; break;
+                default: break;
+            }
 #endif
 #ifdef USE_INFLUXDB
-        switch (INT_md_fix->totalHopCnt) {
-            case 1: flow_info.is_hop_latency = 0x01; break;
-            case 2: flow_info.is_hop_latency = 0x03; break;
-            case 3: flow_info.is_hop_latency = 0x07; break;
-            case 4: flow_info.is_hop_latency = 0x0f; break;
-            case 5: flow_info.is_hop_latency = 0x1f; break;
-            case 6: flow_info.is_hop_latency = 0x3f; break;
-            case 7: flow_info.is_hop_latency = 0x7f; break;
-            case 8: flow_info.is_hop_latency = 0xff; break;
-            default: break;
-        }
+            switch (INT_md_fix->totalHopCnt) {
+                case 1: flow_info.is_hop_latency = 0x01; break;
+                case 2: flow_info.is_hop_latency = 0x03; break;
+                case 3: flow_info.is_hop_latency = 0x07; break;
+                case 4: flow_info.is_hop_latency = 0x0f; break;
+                case 5: flow_info.is_hop_latency = 0x1f; break;
+                case 6: flow_info.is_hop_latency = 0x3f; break;
+                case 7: flow_info.is_hop_latency = 0x7f; break;
+                case 8: flow_info.is_hop_latency = 0xff; break;
+                default: break;
+            }
 #endif
+        }
 
         // flow_info.pkt_cnt++;
         // flow_info.byte_cnt += ntohs(ip->tot_len);

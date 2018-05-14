@@ -20,7 +20,7 @@ class BPFCollector(object):
     def __init__(self):
         super(BPFCollector, self).__init__()
 
-        self.MAX_INT_HOP = 7
+        self.MAX_INT_HOP = 6
         self.SERVER_MODE = "PROMETHEUS"
 
         self.ifaces = set()
