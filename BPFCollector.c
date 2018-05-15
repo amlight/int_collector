@@ -241,11 +241,11 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
-BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 10240);
+BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 100000);
 // nothing to store in tb_ingr yet
 // BPF_TABLE("hash", struct ingr_id_t, struct ingr_info_t, tb_ingr, 256);
-BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 2560);
-BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 2560);
+BPF_TABLE("lru_hash", struct egr_id_t, struct egr_info_t, tb_egr, 3000);
+BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3000);
 // BPF_TABLE("hash", u32, struct flow_info_t, tb_test, 256);
 
 
