@@ -19,7 +19,7 @@ import ctypes as ct
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6):
+    def __init__(self, max_int_hop=6, debug_mode=0, host="localhost", database="INTdatabase"):
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
@@ -50,7 +50,9 @@ class InDBCollector(object):
         self.queue_occup = []
         self.queue_congest = []
 
-        self.client = InfluxDBClient(database="INTdatabase")
+        self.client = InfluxDBClient(host=host, database=database)
+
+        self.debug_mode = debug_mode
 
 
     def attach_iface(self, iface):
@@ -188,22 +190,24 @@ class InDBCollector(object):
                                         })
 
             self.client.write_points(points=event_data)
-            
-            # Print event data for debug
-            print "*" * 20
-            for field_name, field_type in event._fields_:
-                field_arr = getattr(event, field_name)
-                if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
-                                "queue_occups", "queue_ids","ingr_times","egr_times",
-                                "queue_congests","tx_utilizes"]:
-                    _len = len(field_arr)
-                    s = ""
-                    for e in field_arr:
-                        s = s+str(e)+", " 
-                    print field_name+": ", s
-                else:
-                    print field_name+": ", field_arr
 
+            # Print event data for debug
+            if self.debug_mode==1:
+                print "*" * 20
+                for field_name, field_type in event._fields_:
+                    field_arr = getattr(event, field_name)
+                    if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
+                                    "queue_occups", "queue_ids","ingr_times","egr_times",
+                                    "queue_congests","tx_utilizes"]:
+                        _len = len(field_arr)
+                        s = ""
+                        for e in field_arr:
+                            s = s+str(e)+", " 
+                        print field_name+": ", s
+                    else:
+                        print field_name+": ", field_arr
+
+        # self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
         self.bpf_collector["events"].open_perf_buffer(_process_event)
     
     def poll_events(self):
@@ -286,9 +290,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='InfluxBD client.')
     parser.add_argument("ifaces", nargs='+',
         help="List of ifaces to receive INT reports")
+    parser.add_argument("-m", "--max_int_hop", default=6, type=int,
+        help="MAX INT HOP")
+    parser.add_argument("-d", "--debug_mode", default=0, type=int,
+        help="set to 1 to print event")
+    parser.add_argument("-H", "--host", default="localhost",
+        help="InfluxDB server address")
+    parser.add_argument("-D", "--database", default="INTdatabase",
+        help="Database name")
     args = parser.parse_args()
 
-    collector = InDBCollector(max_int_hop=6)
+    collector = InDBCollector(max_int_hop=args.max_int_hop, debug_mode=args.debug_mode,
+                              host=args.host, database=args.database)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 

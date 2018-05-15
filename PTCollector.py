@@ -17,7 +17,7 @@ import ctypes as ct
 class BPFCollector(object):
     """docstring for BPFCollector"""
     
-    def __init__(self, max_int_hop=6):
+    def __init__(self, max_int_hop=6, debug_mode=0):
         super(BPFCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
@@ -39,6 +39,8 @@ class BPFCollector(object):
         # self.tb_test = self.bpf_collector.get_table("tb_test")
 
         self.flow_paths = {}
+
+        self.debug_mode = debug_mode
 
         # gauge
         # self.g_flow_pkt_cnt = Gauge('flow_pkt_cnt', 'flow packet count',
@@ -250,20 +252,22 @@ class BPFCollector(object):
 
             
             # Print event data for debug
-            print "*" * 20
-            for field_name, field_type in event._fields_:
-                field_arr = getattr(event, field_name)
-                if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
-                                  "queue_occups", "queue_ids","ingr_times","egr_times",
-                                  "queue_congests","tx_utilizes"]:
-                    _len = len(field_arr)
-                    s = ""
-                    for e in field_arr:
-                        s = s+str(e)+", " 
-                    print field_name+": ", s
-                else:
-                    print field_name+": ", field_arr
+            if self.debug_mode==1:
+                print "*" * 20
+                for field_name, field_type in event._fields_:
+                    field_arr = getattr(event, field_name)
+                    if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
+                                      "queue_occups", "queue_ids","ingr_times","egr_times",
+                                      "queue_congests","tx_utilizes"]:
+                        _len = len(field_arr)
+                        s = ""
+                        for e in field_arr:
+                            s = s+str(e)+", " 
+                        print field_name+": ", s
+                    else:
+                        print field_name+": ", field_arr
 
+        # self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
         self.bpf_collector["events"].open_perf_buffer(_process_event)
     
     def poll_events(self):
@@ -275,9 +279,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Prometheus client.')
     parser.add_argument("ifaces", nargs='+',
         help="List of ifaces to receive INT reports")
+    parser.add_argument("-m", "--max_int_hop", default=6, type=int,
+        help="MAX INT HOP")
+    parser.add_argument("-d", "--debug_mode", default=0, type=int,
+        help="set to 1 to print event")
     args = parser.parse_args()
 
-    collector = BPFCollector(max_int_hop=6)
+    collector = BPFCollector(max_int_hop=args.max_int_hop, debug_mode=args.debug_mode)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 
