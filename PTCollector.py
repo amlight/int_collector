@@ -17,10 +17,10 @@ import ctypes as ct
 class BPFCollector(object):
     """docstring for BPFCollector"""
     
-    def __init__(self):
+    def __init__(self, max_int_hop=6):
         super(BPFCollector, self).__init__()
 
-        self.MAX_INT_HOP = 6
+        self.MAX_INT_HOP = max_int_hop
         self.SERVER_MODE = "PROMETHEUS"
 
         self.ifaces = set()
@@ -277,7 +277,7 @@ if __name__ == "__main__":
         help="List of ifaces to receive INT reports")
     args = parser.parse_args()
 
-    collector = BPFCollector()
+    collector = BPFCollector(max_int_hop=6)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 

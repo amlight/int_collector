@@ -19,10 +19,10 @@ import ctypes as ct
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    def __init__(self):
+    def __init__(self, max_int_hop=6):
         super(InDBCollector, self).__init__()
 
-        self.MAX_INT_HOP = 6
+        self.MAX_INT_HOP = max_int_hop
         self.SERVER_MODE = "INFLUXDB"
 
         self.ifaces = set()
@@ -288,7 +288,7 @@ if __name__ == "__main__":
         help="List of ifaces to receive INT reports")
     args = parser.parse_args()
 
-    collector = InDBCollector()
+    collector = InDBCollector(max_int_hop=6)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 
@@ -315,7 +315,7 @@ if __name__ == "__main__":
         print "eBPF progs Loaded"
         while 1:
 
-            time.sleep(5)
+            time.sleep(15)
 
             data = collector.collect_data()
 
