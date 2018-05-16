@@ -5,14 +5,11 @@ from pyroute2 import IPRoute
 from prometheus_client import start_http_server, Summary
 from prometheus_client import Gauge
 from influxdb import InfluxDBClient
-# from collections import defaultdict
 from ipaddress import IPv4Address
 import time
 import json
-import multiprocessing
+import threading
 import sys
-# import netifaces
-# import os
 import argparse
 import ctypes as ct
 
@@ -42,13 +39,8 @@ class InDBCollector(object):
 
         self.flow_paths = {}
 
-        # self.flow_pkt_cnt = []
-        # self.flow_byte_cnt = []
-        self.flow_latency = []
-        self.flow_hop_latency = []
-        self.tx_utilize = []
-        self.queue_occup = []
-        self.queue_congest = []
+        self.lock = threading.Lock()
+        self.event_data = []
 
         self.client = InfluxDBClient(host=host, database=database)
 
@@ -130,7 +122,7 @@ class InDBCollector(object):
                                                     str(IPv4Address(event.dst_ip)),
                                                     event.dst_port,
                                                     event.ip_proto),
-                                    "time": event.flow_sink_time*1000000000,
+                                    "time": event.flow_sink_time,
                                     "fields": {
                                         # "pkt_cnt"  : event.pkt_cnt,
                                         # "byte_cnt" : event.byte_cnt,
@@ -149,7 +141,7 @@ class InDBCollector(object):
                                                             event.dst_port,
                                                             event.ip_proto,
                                                             event.sw_ids[i]),
-                                            "time": event.egr_times[i]*1000000000,
+                                            "time": event.egr_times[i],
                                             "fields": {
                                                 "value" : event.hop_latencies[i]
                                             }
@@ -161,7 +153,7 @@ class InDBCollector(object):
                     if ((event.is_tx_utilize >> i) & 0x01):
                         event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
                                                            event.sw_ids[i], event.e_port_ids[i]),
-                                            "time": event.egr_times[i]*1000000000,
+                                            "time": event.egr_times[i],
                                             "fields": {
                                                 "value": event.tx_utilizes[i]
                                             }
@@ -172,7 +164,7 @@ class InDBCollector(object):
                     if ((event.is_queue_occup >> i) & 0x01):
                         event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                            "time": event.egr_times[i]*1000000000,
+                                            "time": event.egr_times[i],
                                             "fields": {
                                                 "value": event.queue_occups[i],
                                             }
@@ -183,13 +175,16 @@ class InDBCollector(object):
                     if ((event.is_queue_congest >> i) & 0x01):
                         event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                            "time": event.egr_times[i]*1000000000,
+                                            "time": event.egr_times[i],
                                             "fields": {
                                                 "value": event.queue_congests[i]
                                             }
                                         })
 
-            self.client.write_points(points=event_data)
+            # self.client.write_points(points=event_data)
+            self.lock.acquire()
+            self.event_data.extend(event_data)
+            self.lock.release()
 
             # Print event data for debug
             if self.debug_mode==1:
@@ -207,8 +202,8 @@ class InDBCollector(object):
                     else:
                         print field_name+": ", field_arr
 
-        # self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
-        self.bpf_collector["events"].open_perf_buffer(_process_event)
+        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
+
     
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
@@ -227,7 +222,7 @@ class InDBCollector(object):
                                                     str(IPv4Address(flow_id.dst_ip)),
                                                     flow_id.dst_port,
                                                     flow_id.ip_proto),
-                            "time": flow_info.flow_sink_time*1000000000,
+                            "time": flow_info.flow_sink_time,
                             "fields": {
                                 # "pkt_cnt"  : flow_info.pkt_cnt,
                                 # "byte_cnt" : flow_info.byte_cnt,
@@ -245,7 +240,7 @@ class InDBCollector(object):
                                                             flow_id.dst_port,
                                                             flow_id.ip_proto,
                                                             flow_info.sw_ids[i]),
-                                "time": flow_info.egr_times[i]*1000000000,
+                                "time": flow_info.egr_times[i],
                                 "fields": {
                                     "value" : flow_info.hop_latencies[i]
                                 }
@@ -255,7 +250,7 @@ class InDBCollector(object):
         for (egr_id, egr_info) in self.tb_egr.items():
             data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
                                         egr_id.sw_id, egr_id.p_id),
-                            "time": egr_info.egr_time*1000000000,
+                            "time": egr_info.egr_time,
                             "fields": {
                                 "value": egr_info.tx_utilize
                             }
@@ -264,7 +259,7 @@ class InDBCollector(object):
         for (queue_id, queue_info) in self.tb_queue.items():
             data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
                                         queue_id.sw_id, queue_id.q_id),
-                            "time": queue_info.q_time*1000000000,
+                            "time": queue_info.q_time,
                             "fields": {
                                 "value": queue_info.occup,
                             }
@@ -272,7 +267,7 @@ class InDBCollector(object):
 
             data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
                                         queue_id.sw_id, queue_id.q_id),
-                            "time": queue_info.q_time*1000000000,
+                            "time": queue_info.q_time,
                             "fields": {
                                 "value": queue_info.congest
                             }
@@ -285,76 +280,4 @@ class InDBCollector(object):
 
 
 #---------------------------------------------------------------------------
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='InfluxBD client.')
-    parser.add_argument("ifaces", nargs='+',
-        help="List of ifaces to receive INT reports")
-    parser.add_argument("-m", "--max_int_hop", default=6, type=int,
-        help="MAX INT HOP")
-    parser.add_argument("-d", "--debug_mode", default=0, type=int,
-        help="set to 1 to print event")
-    parser.add_argument("-H", "--host", default="localhost",
-        help="InfluxDB server address")
-    parser.add_argument("-D", "--database", default="INTdatabase",
-        help="Database name")
-    args = parser.parse_args()
-
-    collector = InDBCollector(max_int_hop=args.max_int_hop, debug_mode=args.debug_mode,
-                              host=args.host, database=args.database)
-    for iface in args.ifaces:
-        collector.attach_iface(iface)
-
-    # clear all old dbs. For easy testing
-    for db in collector.client.get_list_database():
-        collector.client.drop_database(db["name"])
-    collector.client.create_database("INTdatabase")
-
-    # run poll event
-    poll_stop_flag = 0
-    
-    def _poll_event_proc():
-        # only run when put open_events here. maybe st with thread
-        collector.open_events()
-        while not poll_stop_flag:
-            collector.poll_events()
-        return
-
-    poll_event_proc = multiprocessing.Process(target=_poll_event_proc)
-    poll_event_proc.start()
-
-
-    try:
-        print "eBPF progs Loaded"
-        while 1:
-
-            time.sleep(15)
-
-            data = collector.collect_data()
-
-            if not data:
-                continue
-
-            collector.client.write_points(points=data)
-
-
-    except KeyboardInterrupt:
-        pass
-
-    finally:
-
-        poll_stop_flag = 1
-        # poll_event_proc.join()
-
-        # print "flow_pkt_cnt: ", collector.client.query(query="select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\""), "\n"
-        # print "flow_byte_cnt: ", collector.client.query(query="select * from flow_byte_cnt"), "\n"
-        # print "flow_latency: ", collector.client.query(query="select * from flow_latency"), "\n"
-        # print "flow_hop_latency: ", collector.client.query(query="select * from flow_hop_latency"), "\n"
-        # print "tx_utilize: ", collector.client.query(query="select * from tx_utilize"), "\n"
-        # print "queue_occup: ", collector.client.query(query="select * from queue_occup"), "\n"
-        # print "queue_congest: ", collector.client.query(query="select * from queue_congest"), "\n"
-
-        collector.detach_all_iface()
-        print("Done")
-
-    print "Exit"
+# if __name__ == "__main__":
