@@ -9,7 +9,7 @@ parser.add_argument("-m", "--max_int_hop", default=6, type=int,
     help="MAX INT HOP")
 parser.add_argument("-H", "--host", default="localhost",
     help="InfluxDB server address")
-parser.add_argument("-D", "--database", default="INTTdatabase",
+parser.add_argument("-D", "--database", default="INTdatabase",
     help="Database name")
 parser.add_argument("-c", "--cython", action='store_true',
     help="Use Cython")    
@@ -37,8 +37,7 @@ if args.cython == False:
     from InDBCollector import InDBCollector
 else:
     import pyximport; pyximport.install()
-    from xy_InDBCollector import Cy_InDBCollector
-    from cy_InDBCollector import _MAX_INT_HOP
+    from cy_InDBCollector import Cy_InDBCollector, _MAX_INT_HOP
 
 if __name__ == "__main__":
 
