@@ -54,13 +54,13 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
  
 > Run the collector with `-h` option for more help. If there are any missing libraries, install them using `pip`. 
 >
-> INT Telemetry reports in pcap file can be created using `INT_gen\INTReport.py`.
+> INT Telemetry reports in pcap file can be created using `benchmark/INTReport.py`.
 >
 > If there are errors that eBPF program cannot load (such as _cannot allocate memory_), please ensure that the network interfaces the BPFCollector listens to has XDP support by current kernel. Check [here](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#xdp). 
 
 # Server setup
 
-* For Prometheus: Install and run Prometheus server from https://prometheus.io . Config the `.yml` file to scrape the `BPFCollector` client. Address of should be `localhost` if Prometheus server and `BPFCollector` run on the same machine.
+* For Prometheus: Install and run Prometheus server from https://prometheus.io . Config the `.yml` file to scrape the `BPFCollector` client. Address should be `localhost` if Prometheus server and `BPFCollector` run on the same machine.
 
 * For InfluxDB: InfluxDB python client requires InfluxDB sever v1.2.4:
 
