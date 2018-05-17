@@ -92,6 +92,8 @@ if __name__ == "__main__":
                 data = collector.collect_data()
                 if data:
                     collector.client.write_points(points=data)
+                    if args.debug_mode==2:
+                        print "Periodically push: ", len(data)
 
     periodically_push = threading.Thread(target=_periodically_push)
     periodically_push.start()
