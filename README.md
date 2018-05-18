@@ -42,8 +42,8 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
 
   ``` shell
     $ sudo ip link add veth_0 type veth peer name veth_1
-    $ sudo ip link set dev veth0 up
-    $ sudo ip link set dev veth1 up
+    $ sudo ip link set dev veth_0 up
+    $ sudo ip link set dev veth_1 up
   ```
 * Run `BPFCollector` at the network interface that can listen to INT Telemetry reports. If you create `veth` pair above, you can send reports to `veth_0` and listen to reports at `veth_1`:
 
