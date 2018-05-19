@@ -231,20 +231,21 @@ class InDBCollector(object):
                                 "path" : path_str
                             }
                         })
-
-            for i in range(0, flow_info.num_INT_hop):
-                data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
-                                                            str(IPv4Address(flow_id.src_ip)),
-                                                            flow_id.src_port,
-                                                            str(IPv4Address(flow_id.dst_ip)),
-                                                            flow_id.dst_port,
-                                                            flow_id.ip_proto,
-                                                            flow_info.sw_ids[i]),
-                                "time": flow_info.egr_times[i],
-                                "fields": {
-                                    "value" : flow_info.hop_latencies[i]
-                                }
-                            })
+            
+            if flow_info.is_hop_latency:
+                for i in range(0, flow_info.num_INT_hop):
+                    data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
+                                                                str(IPv4Address(flow_id.src_ip)),
+                                                                flow_id.src_port,
+                                                                str(IPv4Address(flow_id.dst_ip)),
+                                                                flow_id.dst_port,
+                                                                flow_id.ip_proto,
+                                                                flow_info.sw_ids[i]),
+                                    "time": flow_info.egr_times[i],
+                                    "fields": {
+                                        "value" : flow_info.hop_latencies[i]
+                                    }
+                                })
 
 
         for (egr_id, egr_info) in self.tb_egr.items():
