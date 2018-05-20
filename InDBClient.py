@@ -15,6 +15,8 @@ parser.add_argument("-c", "--cython", action='store_true',
     help="Use Cython")    
 parser.add_argument("-p", "--period", default=10, type=int,
     help="Time period to push data in normal condition")
+parser.add_argument("-P", "--event_period", default=1, type=float,
+    help="Time period to push event data")
 parser.add_argument("-d", "--debug_mode", default=0, type=int,
     help="Set to 1 to print event")
 args = parser.parse_args()
@@ -63,40 +65,42 @@ if __name__ == "__main__":
     
     push_stop_flag = threading.Event()
 
-    # A separated thread to push data
-    def _periodically_push():
-        push_cnt = 1
-        _period_push_event = 2
-        _period_normal = args.period/_period_push_event
+    # A separated thread to push event data
+    def _event_push():
 
         while not push_stop_flag.is_set():
-            time.sleep(_period_push_event)
-
-            push_cnt += 1
-            if push_cnt == _period_normal:
-                push_cnt = 0
             
-            data = []
+            time.sleep(args.event_period)
+            
             collector.lock.acquire()
             data = collector.event_data
             collector.event_data = []
             collector.lock.release()
             
             if args.debug_mode==2:
-                print "len of events: ", len(data)
+                print "Len of events: ", len(data)
             
             if data:
                 collector.client.write_points(points=data)
 
-            if push_cnt == 0:
-                data = collector.collect_data()
-                if data:
-                    collector.client.write_points(points=data)
-                    if args.debug_mode==2:
-                        print "Periodically push: ", len(data)
+
+    # A separated thread to push data
+    def _periodically_push():
+        while not push_stop_flag.is_set():
+            
+            time.sleep(args.period)
+
+            data = collector.collect_data()
+            if data:
+                collector.client.write_points(points=data)
+                if args.debug_mode==2:
+                    print "Periodically push: ", len(data)
+
 
     periodically_push = threading.Thread(target=_periodically_push)
     periodically_push.start()
+    event_push = threading.Thread(target=_event_push)
+    event_push.start()
 
 
     # Start polling events
@@ -112,6 +116,7 @@ if __name__ == "__main__":
     finally:
         push_stop_flag.set()
         periodically_push.join()
+        event_push.join()
 
         collector.detach_all_iface()
         print("Done")
