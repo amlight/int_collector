@@ -455,7 +455,7 @@ int collector(struct xdp_md *ctx) {
 
     } else {
 
-        if (flow_info.flow_sink_time > flow_info_p->flow_sink_time + TIME_GAP_W) {
+        if (flow_info.flow_sink_time >= flow_info_p->flow_sink_time + TIME_GAP_W) {
                 is_update = 1;
             }
 
@@ -541,7 +541,7 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1; 
             } 
             else {
-                if (egr_info.egr_time > egr_info_p->egr_time + TIME_GAP_W) {
+                if (egr_info.egr_time >= egr_info_p->egr_time + TIME_GAP_W) {
                     is_update = 1;
                 }
 
@@ -604,7 +604,7 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
 
             } else {
-                if (queue_info.q_time > queue_info_p->q_time + TIME_GAP_W) {
+                if (queue_info.q_time >= queue_info_p->q_time + TIME_GAP_W) {
                     is_update = 1;
                 }
 
