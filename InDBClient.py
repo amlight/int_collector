@@ -86,9 +86,14 @@ if __name__ == "__main__":
 
     # A separated thread to push data
     def _periodically_push():
+        cnt = 0
         while not push_stop_flag.is_set():
-            
-            time.sleep(args.period)
+            # use cnt to partition sleep time, so Ctrl-C could terminate the program earlier
+            time.sleep(1)
+            cnt += 1
+            if cnt < args.period:
+                continue
+            cnt = 0
 
             data = collector.collect_data()
             if data:
