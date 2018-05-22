@@ -49,6 +49,7 @@
 
 // TODO: set these values from use space
 #define HOP_LATENCY 6 // 64
+#define FLOW_LATENCY 6
 #define QUEUE_OCCUP 6
 #define QUEUE_CONGEST 6
 #define TX_UTILIZE 6
@@ -231,7 +232,7 @@ struct flow_info_t {
 #endif
     
 #ifdef USE_INFLUXDB
-    u8 is_path;
+    u8 is_flow;
     u8 is_hop_latency;
     u8 is_queue_occup;
     u8 is_queue_congest;
@@ -459,6 +460,16 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
             }
 
+            if (is_hop_latencies &&
+                flow_info.flow_latency >> FLOW_LATENCY != 
+                flow_info_p->flow_latency >> FLOW_LATENCY) {
+                
+#ifdef USE_INFLUXDB
+                flow_info.is_flow = 1;
+#endif
+                is_update = 1;
+            }
+
         num_INT_hop = INT_md_fix->totalHopCnt;
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
@@ -467,7 +478,7 @@ int collector(struct xdp_md *ctx) {
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
 #ifdef USE_INFLUXDB
-                flow_info.is_path = 1;
+                flow_info.is_flow = 1;
 #endif
                 if (is_hop_latencies) {
 #ifdef USE_PROMETHEUS
@@ -639,7 +650,7 @@ int collector(struct xdp_md *ctx) {
         flow_info.is_n_queue_congest | flow_info.is_n_tx_utilize
 #endif
 #ifdef USE_INFLUXDB
-        | flow_info.is_path | flow_info.is_hop_latency |
+        | flow_info.is_flow | flow_info.is_hop_latency |
         flow_info.is_queue_occup | flow_info.is_queue_congest |
         flow_info.is_tx_utilize
 #endif

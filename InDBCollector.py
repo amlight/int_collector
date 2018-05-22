@@ -101,7 +101,7 @@ class InDBCollector(object):
                              # ("is_n_queue_congest", ct.c_ubyte),
                              # ("is_n_tx_utilize", ct.c_ubyte),
 
-                             ("is_path", ct.c_ubyte),
+                             ("is_flow", ct.c_ubyte),
                              ("is_hop_latency", ct.c_ubyte),
                              ("is_queue_occup", ct.c_ubyte),
                              ("is_queue_congest", ct.c_ubyte),
@@ -114,7 +114,7 @@ class InDBCollector(object):
             
             event_data = []
             
-            if event.is_n_flow or event.is_path:
+            if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
                 event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
                                                     str(IPv4Address(event.src_ip)),

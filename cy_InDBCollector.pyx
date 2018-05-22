@@ -42,7 +42,7 @@ cdef struct Event:
     unsigned int   flow_latency
     unsigned int   flow_sink_time
     unsigned char  is_n_flow
-    unsigned char  is_path
+    unsigned char  is_flow
     unsigned char  is_hop_latency
     unsigned char  is_queue_occup
     unsigned char  is_queue_congest
@@ -65,7 +65,7 @@ class Cy_InDBCollector(InDBCollector):
             
             event_data = []
             
-            if event.is_n_flow or event.is_path:
+            if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
                 event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
                                                     str(IPv4Address(event.src_ip)),
@@ -159,7 +159,7 @@ class Cy_InDBCollector(InDBCollector):
                 print "flow_latency", event.flow_latency
                 print "flow_sink_time", event.flow_sink_time
                 print "is_n_flow", event.is_n_flow
-                print "is_path", event.is_path
+                print "is_flow", event.is_flow
                 print "is_hop_latency", event.is_hop_latency
                 print "is_queue_occup", event.is_queue_occup
                 print "is_queue_congest", event.is_queue_congest
