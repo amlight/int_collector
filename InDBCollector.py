@@ -2,6 +2,7 @@
 
 from bcc import BPF
 from influxdb import InfluxDBClient
+from ipaddress import IPv4Address
 import threading
 import ctypes as ct
 
