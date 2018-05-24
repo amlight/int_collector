@@ -48,7 +48,7 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
 * Run `BPFCollector` at the network interface that can listen to INT Telemetry reports. If you create `veth` pair above, you can send reports to `veth_0` and listen to reports at `veth_1`:
 
  ``` shell
-    $ sudo python PTCollector.py veth_1 # For Prometheus
+    $ sudo python PTClient.py veth_1 # For Prometheus
     $ sudo python InDBClient.py veth_1 # For InfluxDB
  ```
  

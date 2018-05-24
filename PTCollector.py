@@ -1,16 +1,14 @@
 #!/usr/bin/python
 
 from bcc import BPF
-from prometheus_client import start_http_server, Summary
 from prometheus_client import Gauge
-import argparse
 import ctypes as ct
 
-class BPFCollector(object):
-    """docstring for BPFCollector"""
+class PTCollector(object):
+    """docstring for PTCollector"""
     
     def __init__(self, max_int_hop=6, debug_mode=0):
-        super(BPFCollector, self).__init__()
+        super(PTCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
         self.SERVER_MODE = "PROMETHEUS"
@@ -264,35 +262,4 @@ class BPFCollector(object):
         self.bpf_collector.kprobe_poll()
 
 #---------------------------------------------------------------------------
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(description='Prometheus client.')
-    parser.add_argument("ifaces", nargs='+',
-        help="List of ifaces to receive INT reports")
-    parser.add_argument("-m", "--max_int_hop", default=6, type=int,
-        help="MAX INT HOP")
-    parser.add_argument("-d", "--debug_mode", default=0, type=int,
-        help="set to 1 to print event")
-    args = parser.parse_args()
-
-    collector = BPFCollector(max_int_hop=args.max_int_hop, debug_mode=args.debug_mode)
-    for iface in args.ifaces:
-        collector.attach_iface(iface)
-
-    collector.open_events()
-    
-    start_http_server(8000)
-
-    try:
-        print "eBPF progs Loaded"
-        while 1:
-            collector.poll_events()
-
-    except KeyboardInterrupt:
-        pass
-
-    finally:
-        collector.detach_all_iface()
-        print("Done")
-
-    print "Exit"
+# if __name__ == "__main__":
