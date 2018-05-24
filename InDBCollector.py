@@ -27,7 +27,6 @@ class InDBCollector(object):
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
-        # self.tb_test = self.bpf_collector.get_table("tb_test")
 
         self.flow_paths = {}
 
@@ -218,7 +217,6 @@ class InDBCollector(object):
                             "fields": {
                                 # "pkt_cnt"  : flow_info.pkt_cnt,
                                 # "byte_cnt" : flow_info.byte_cnt,
-                                # dont need path here. if there is path change, it should
                                 "flow_latency" : flow_info.flow_latency,
                                 "path" : path_str
                             }

@@ -28,7 +28,6 @@ class BPFCollector(object):
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
-        # self.tb_test = self.bpf_collector.get_table("tb_test")
 
         self.flow_paths = {}
 
