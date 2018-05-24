@@ -11,8 +11,8 @@ parser.add_argument("-H", "--host", default="localhost",
     help="InfluxDB server address")
 parser.add_argument("-D", "--database", default="INTdatabase",
     help="Database name")
-parser.add_argument("-c", "--cython", action='store_true',
-    help="Use Cython")    
+parser.add_argument("--perf", action='store_true',
+    help="Use peformance mode")    
 parser.add_argument("-p", "--period", default=10, type=int,
     help="Time period to push data in normal condition")
 parser.add_argument("-P", "--event_period", default=1, type=float,
@@ -35,7 +35,7 @@ import multiprocessing
 import sys
 import ctypes as ct
 
-if args.cython == False:
+if args.perf == False:
     from InDBCollector import InDBCollector
 else:
     import pyximport; pyximport.install()
@@ -43,16 +43,21 @@ else:
 
 if __name__ == "__main__":
 
-    if args.cython == True:
+    if args.perf == True:
         if _MAX_INT_HOP != args.max_int_hop:
             raise NameError("Set _MAX_INT_HOP in cy_InDBCollector to match \
                 input max_int_hop and recompile")
         
         collector = Cy_InDBCollector(max_int_hop=args.max_int_hop, 
             debug_mode=args.debug_mode, host=args.host, database=args.database)
+
+        protocol = "line" 
+
     else:
         collector = InDBCollector(max_int_hop=args.max_int_hop,
             debug_mode=args.debug_mode, host=args.host, database=args.database)
+
+        protocol = "json" 
     
     for iface in args.ifaces:
         collector.attach_iface(iface)
@@ -81,7 +86,7 @@ if __name__ == "__main__":
                 print "Len of events: ", len(data)
             
             if data:
-                collector.client.write_points(points=data)
+                collector.client.write_points(points=data, protocol=protocol)
 
 
     # A separated thread to push data
@@ -97,7 +102,7 @@ if __name__ == "__main__":
 
             data = collector.collect_data()
             if data:
-                collector.client.write_points(points=data)
+                collector.client.write_points(points=data, protocol=protocol)
                 if args.debug_mode==2:
                     print "Periodically push: ", len(data)
 

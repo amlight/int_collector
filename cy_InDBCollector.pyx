@@ -4,7 +4,6 @@ from bcc import BPF
 from pyroute2 import IPRoute
 from prometheus_client import start_http_server, Summary
 from prometheus_client import Gauge
-from influxdb import InfluxDBClient
 from ipaddress import IPv4Address
 import time
 import json
@@ -12,11 +11,12 @@ import threading
 import sys
 import argparse
 import ctypes as ct
-
 from InDBCollector import InDBCollector
+from influxdb import InfluxDBClient
 
 from libc.stdint cimport uintptr_t
-import pyximport
+import pyximport; pyximport.install()
+from cy_line_protocol import make_line
 
 
 # change array len of sw_ids.. to .. tx_utilizes to match with max_int_hop in the collector
@@ -55,6 +55,10 @@ class Cy_InDBCollector(InDBCollector):
         super(Cy_InDBCollector, self).__init__(max_int_hop=max_int_hop,
             debug_mode=debug_mode, host=host, database=database)
 
+    def int_2_ip4_str(self, ipint):
+            cdef unsigned char i
+            return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
+
     def open_events(self):
         def _process_event(ctx, data, size):
             
@@ -67,70 +71,63 @@ class Cy_InDBCollector(InDBCollector):
             
             if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
-                event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
-                                                    str(IPv4Address(event.src_ip)),
-                                                    event.src_port,
-                                                    str(IPv4Address(event.dst_ip)),
-                                                    event.dst_port,
-                                                    event.ip_proto),
-                                    "time": event.flow_sink_time,
-                                    "fields": {
-                                        # "pkt_cnt"  : event.pkt_cnt,
-                                        # "byte_cnt" : event.byte_cnt,
-                                        "flow_latency" : event.flow_latency,
-                                        "path": path_str
-                                    }
-                                })
+
+                event_data.append(make_line(measurement="flow_stat,%s:%d->%s:%d,proto=%d" % (
+                                                            self.int_2_ip4_str(event.src_ip),
+                                                            event.src_port,
+                                                            self.int_2_ip4_str(event.dst_ip),
+                                                            event.dst_port,
+                                                            event.ip_proto),
+                                          key_val_list=[("flow_latency" , event.flow_latency),
+                                                        ("path"         , path_str)],
+                                          time=None 
+                                          # time=event.flow_sink_time, 
+                                         ))
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_hop_latency >> i) & 0x01):
-                        event_data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(
-                                                            str(IPv4Address(event.src_ip)),
-                                                            event.src_port,
-                                                            str(IPv4Address(event.dst_ip)),
-                                                            event.dst_port,
-                                                            event.ip_proto,
-                                                            event.sw_ids[i]),
-                                            "time": event.egr_times[i],
-                                            "fields": {
-                                                "value" : event.hop_latencies[i]
-                                            }
-                                        })
-
+                        event_data.append(make_line(measurement="flow_hop_latency,%s:%d->%s:%d,proto=%d,sw_id=%d" % (
+                                                                self.int_2_ip4_str(event.src_ip),
+                                                                event.src_port,
+                                                                self.int_2_ip4_str(event.dst_ip),
+                                                                event.dst_port,
+                                                                event.ip_proto,
+                                                                event.sw_ids[i]),
+                                  key_val_list=[("value", event.hop_latencies[i])],
+                                  time=None 
+                                  # time=event.egr_times[i], 
+                                 ))
 
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_tx_utilize >> i) & 0x01):
-                        event_data.append({"measurement": "port_tx_utilize,sw_id={0},port_id={1}".format(
+                        event_data.append(make_line(measurement="port_tx_utilize,sw_id=%d,port_id=%d" % (
                                                            event.sw_ids[i], event.e_port_ids[i]),
-                                            "time": event.egr_times[i],
-                                            "fields": {
-                                                "value": event.tx_utilizes[i]
-                                            }
-                                        })
+                                  key_val_list=[("value", event.tx_utilizes[i])],
+                                  time=None 
+                                  # time=event.egr_times[i], 
+                                 ))
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_queue_occup >> i) & 0x01):
-                        event_data.append({"measurement": "queue_occupancy,sw_id={0},queue_id={1}".format(
+                        event_data.append(make_line(measurement="queue_occupancy,sw_id=%d,queue_id=%d" % (
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                            "time": event.egr_times[i],
-                                            "fields": {
-                                                "value": event.queue_occups[i],
-                                            }
-                                        })
+                                  key_val_list=[("value", event.queue_occups[i])],
+                                  time=None 
+                                  # time=event.egr_times[i],, 
+                                 ))
 
             if event.is_queue_congest:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_queue_congest >> i) & 0x01):
-                        event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
+                        event_data.append(make_line(measurement="queue_congestion,sw_id=%d,queue_id=%d" % (
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                            "time": event.egr_times[i],
-                                            "fields": {
-                                                "value": event.queue_congests[i]
-                                            }
-                                        })
+                                  key_val_list=[("value", event.queue_congests[i])],
+                                  time=None 
+                                  # time=event.egr_times[i], 
+                                 ))
 
             # self.client.write_points(points=event_data)
             self.lock.acquire()
@@ -166,3 +163,54 @@ class Cy_InDBCollector(InDBCollector):
                 print "is_tx_utilize", event.is_tx_utilize
                 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
+
+
+    def collect_data(self):
+
+        data = []
+
+        for (flow_id, flow_info) in self.tb_flow.iteritems():
+            path_str = ":".join(str(flow_info.sw_ids[i]) for i in reversed(range(0, flow_info.num_INT_hop)))
+            
+            flow_id_str = "%s:%d->%s:%d,proto=%d" % (self.int_2_ip4_str(flow_id.src_ip), \
+                                                    flow_id.src_port, \
+                                                    self.int_2_ip4_str(flow_id.dst_ip), \
+                                                    flow_id.dst_port, \
+                                                    flow_id.ip_proto)
+
+            data.append(make_line(measurement="flow_stat,%s" % flow_id_str,
+                                  key_val_list=[("flow_latency" , flow_info.flow_latency),
+                                                ("path"         , path_str)],
+                                  time=None 
+                                  # time=flow_info.flow_sink_time, 
+                                 ))
+            
+            if flow_info.is_hop_latency:
+                for i in range(0, flow_info.num_INT_hop):
+                    data.append(make_line(measurement="flow_hop_latency,%s,sw_id=%d" %(flow_id_str, flow_info.sw_ids[i]),
+                                  key_val_list=[("value", flow_info.hop_latencies[i])],
+                                  time=None 
+                                  # time=flow_info.egr_times[i], 
+                                 ))
+
+        for (egr_id, egr_info) in self.tb_egr.items():
+            data.append(make_line(measurement="port_tx_utilize,sw_id=%d,port_id=%d" % (egr_id.sw_id, egr_id.p_id),
+                                  key_val_list=[("value", egr_info.tx_utilize)],
+                                  time=None 
+                                  # time=egr_info.egr_time, 
+                                 ))
+
+        for (queue_id, queue_info) in self.tb_queue.items():
+            data.append(make_line(measurement="queue_occupancy,sw_id=%d,queue_id=%d" % (queue_id.sw_id, queue_id.q_id),
+                                  key_val_list=[("value", queue_info.occup)],
+                                  time=None 
+                                  # time=queue_info.q_time, 
+                                 ))
+
+            data.append(make_line(measurement="queue_congestion,sw_id=%d,queue_id=%d" % (queue_id.sw_id, queue_id.q_id),
+                                  key_val_list=[("value", queue_info.congest)],
+                                  time=None 
+                                  # time=queue_info.q_time, 
+                                 ))
+
+        return data

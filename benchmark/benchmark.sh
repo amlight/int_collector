@@ -24,8 +24,8 @@ xdotool key Return
 sleep 2
 
 # start test
-for RATE in 400000 600000 800000 1000000 1200000 1400000; do
-	for COLLECTOR in "PTCollector.py" "InDBClient.py --cython -H 192.168.122.106"; do
+for RATE in 400000 600000 800000 1000000 1200000 1400000 ; do
+	for COLLECTOR in "PTCollector.py" "InDBClient.py --perf -H 192.168.122.106"; do
 
 		if [ $COLLECTOR == "PTCollector.py" ]
 		then
@@ -44,7 +44,8 @@ for RATE in 400000 600000 800000 1000000 1200000 1400000; do
 
 		# start tcpreplay
 		xdotool key alt+$TCPREPLAY
-		xdotool type "tcpreplay -i vtap0  -K --loop 50000000 --unique-ip -p $RATE pcaps/t3_6sw_100fl_swid_hoplatency.pcap"
+		# xdotool type "tcpreplay -i vtap0  -K --loop 50000000 --unique-ip -p $RATE pcaps/t3_6sw_100fl_swid_hoplatency.pcap"
+		xdotool type "./pkt-gen -i vtap0 -f tx -P pcaps/t3_6sw_100fl_all.pcap -R $RATE -b 128"
 		xdotool key Return
 		sleep 4
 
@@ -129,7 +130,7 @@ for REPORT in 	"t1_6sw_10fl_swid.pcap" \
 				"t4_3sw_100fl_200event_all.pcap" \
 				"t4_3sw_100fl_500event_all.pcap"; do
 
-	for COLLECTOR in "PTCollector.py" "InDBClient.py --cython -H 192.168.122.106"; do
+	for COLLECTOR in "PTCollector.py" "InDBClient.py --perf -H 192.168.122.106"; do
 
 		if [ $COLLECTOR == "PTCollector.py" ]
 		then

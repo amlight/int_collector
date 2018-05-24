@@ -231,7 +231,7 @@ class InDBCollector(object):
                                 "path" : path_str
                             }
                         })
-            
+
             if flow_info.is_hop_latency:
                 for i in range(0, flow_info.num_INT_hop):
                     data.append({"measurement": "flow_hop_latency,{0}:{1}->{2}:{3},proto={4},sw_id={5}".format(

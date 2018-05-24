@@ -32,7 +32,7 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
     $ sudo sysctl net/core/bpf_jit_enable=1
  ```
 
-* [Optional] Install `Cython` to run the InfluxDB Client with option `--cython`, which is faster:
+* [Optional] Install `Cython` to run the InfluxDB Client with option `--perf`, which is faster:
 
  ``` shell
     $ pip install Cython
