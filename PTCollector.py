@@ -259,8 +259,7 @@ class BPFCollector(object):
                     else:
                         print field_name+": ", field_arr
 
-        # self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
-        self.bpf_collector["events"].open_perf_buffer(_process_event)
+        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
     
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
