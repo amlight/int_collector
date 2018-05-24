@@ -397,7 +397,10 @@ int collector(struct xdp_md *ctx) {
         Store data and event detection. New event when: 
         - New data
         - Path change
-        - Exceed threshold (hop latency, queue occupancy, queue congestion)
+        - Value out of interval. For easy implementation, the 
+        interval is power of 2. E.g., for hop latency, the interval
+        is 2**HOP_LATENCY. If HOP_LATENCY shift is 6, interval is
+        64 (0-64, 64-128, 128-192, etc.)
     */
 
     // Assume that sw_id is alway presented.
