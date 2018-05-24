@@ -37,9 +37,9 @@ cdef struct Event:
 class Cy_InDBCollector(InDBCollector):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6, debug_mode=0, host="localhost", database="INTdatabase"):
+    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, host="localhost", database="INTdatabase"):
         super(Cy_InDBCollector, self).__init__(max_int_hop=max_int_hop,
-            debug_mode=debug_mode, host=host, database=database)
+                int_dst_port=int_dst_port, debug_mode=debug_mode, host=host, database=database)
 
     def int_2_ip4_str(self, ipint):
             cdef unsigned char i

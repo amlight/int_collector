@@ -7,11 +7,12 @@ import ctypes as ct
 class PTCollector(object):
     """docstring for PTCollector"""
     
-    def __init__(self, max_int_hop=6, debug_mode=0):
+    def __init__(self, max_int_hop=6, int_dst_port=54321, debug_mode=0):
         super(PTCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
         self.SERVER_MODE = "PROMETHEUS"
+        self.INT_DST_PORT = int_dst_port
 
         self.ifaces = set()
 
@@ -19,7 +20,8 @@ class PTCollector(object):
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
             cflags=["-w", 
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
-                    "-D_SERVER_MODE=%s" % self.SERVER_MODE])
+                    "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
+                    "-D_SERVER_MODE=%s" % self.SERVER_MODE,])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
     
         # get all the info table

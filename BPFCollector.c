@@ -8,7 +8,6 @@
 
 
 #define ETHTYPE_IP 0x0800
-#define INT_DST_PORT 54321
 
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
@@ -16,6 +15,7 @@
 // get from cflags
 // detail: https://stackoverflow.com/questions/25254043/is-it-
 // possible-to-compare-ifdef-values-for-conditional-use
+#define INT_DST_PORT _INT_DST_PORT
 #define MAX_INT_HOP _MAX_INT_HOP
 #define SERVER_MODE _SERVER_MODE
 

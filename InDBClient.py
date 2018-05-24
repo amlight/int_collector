@@ -9,6 +9,8 @@ parser.add_argument("ifaces", nargs='+',
 help="List of ifaces to receive INT reports")
 parser.add_argument("-m", "--max_int_hop", default=6, type=int,
     help="MAX INT HOP")
+parser.add_argument("-i", "--int_port", default=54321, type=int,
+        help="Destination port of INT Telemetry reports")
 parser.add_argument("-H", "--host", default="localhost",
     help="InfluxDB server address")
 parser.add_argument("-D", "--database", default="INTdatabase",
@@ -38,14 +40,16 @@ if __name__ == "__main__":
             raise NameError("Set _MAX_INT_HOP in cy_InDBCollector to match \
                 input max_int_hop and recompile")
         
-        collector = Cy_InDBCollector(max_int_hop=args.max_int_hop, 
-            debug_mode=args.debug_mode, host=args.host, database=args.database)
+        collector = Cy_InDBCollector(max_int_hop=args.max_int_hop,
+            int_dst_port=args.int_port, debug_mode=args.debug_mode,
+            host=args.host, database=args.database)
 
         protocol = "line" 
 
     else:
         collector = InDBCollector(max_int_hop=args.max_int_hop,
-            debug_mode=args.debug_mode, host=args.host, database=args.database)
+            int_dst_port=args.int_port, debug_mode=args.debug_mode,
+            host=args.host, database=args.database)
 
         protocol = "json" 
     

@@ -8,11 +8,15 @@ if __name__ == "__main__":
         help="List of ifaces to receive INT reports")
     parser.add_argument("-m", "--max_int_hop", default=6, type=int,
         help="MAX INT HOP")
+    parser.add_argument("-i", "--int_port", default=54321, type=int,
+        help="Destination port of INT Telemetry reports")
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
         help="set to 1 to print event")
     args = parser.parse_args()
 
-    collector = PTCollector(max_int_hop=args.max_int_hop, debug_mode=args.debug_mode)
+    collector = PTCollector(max_int_hop=args.max_int_hop, 
+                            int_dst_port=args.int_port,
+                            debug_mode=args.debug_mode)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 
