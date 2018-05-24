@@ -15,8 +15,9 @@ parser.add_argument("-H", "--host", default="localhost",
     help="InfluxDB server address")
 parser.add_argument("-D", "--database", default="INTdatabase",
     help="Database name")
-parser.add_argument("--perf", action='store_true',
-    help="Use peformance mode")    
+parser.add_argument("--non_perf", action='store_true',
+    help="Disable peformance optimization. Use when cannot install cython \
+        or cython compiler error")    
 parser.add_argument("-p", "--period", default=10, type=int,
     help="Time period to push data in normal condition")
 parser.add_argument("-P", "--event_period", default=1, type=float,
@@ -26,7 +27,7 @@ parser.add_argument("-d", "--debug_mode", default=0, type=int,
 args = parser.parse_args()
 
 
-if args.perf == False:
+if args.non_perf == True:
     from InDBCollector import InDBCollector
 else:
     import pyximport; pyximport.install()
@@ -35,7 +36,7 @@ else:
 
 if __name__ == "__main__":
 
-    if args.perf == True:
+    if args.non_perf == False:
         if _MAX_INT_HOP != args.max_int_hop:
             raise NameError("Set _MAX_INT_HOP in cy_InDBCollector to match \
                 input max_int_hop and recompile")

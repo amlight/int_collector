@@ -32,7 +32,7 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
     $ sudo sysctl net/core/bpf_jit_enable=1
  ```
 
-* [Optional] Install `Cython` to run the InfluxDB Client with option `--perf`, which is faster:
+* [Optional] Install `Cython` to run the InfluxDB Client with better performance (recommended). If not, use option `--non_perf` when running InfluxDB client:
 
  ``` shell
     $ pip install Cython
@@ -52,6 +52,8 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
     $ sudo python InDBClient.py veth_1 # For InfluxDB
  ```
  
+> If cannot install `cython` or has cython compiler error with InDBClient, go back to generic mode with `--non_perf` option.
+>
 > Run the collector with `-h` option for more help. If there are any missing libraries, install them using `pip`. 
 >
 > INT Telemetry reports in pcap file can be created using `benchmark/INTReport.py`.
