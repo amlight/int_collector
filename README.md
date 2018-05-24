@@ -4,7 +4,7 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
 `BPFCollector` use [eBPF](https://www.iovisor.org/technology/ebpf) and [XDP](https://www.iovisor.org/technology/xdp), which require recent linux kernel. For best practice, kernel version >= v4.14 should be used.
 # Installation
 
-* Install Ubuntu VM with kernel version >= 4.14. Our test uses Ubuntu 18.04 64 bit with kernel v4.15.
+* Install Ubuntu VM with kernel version >= 4.14. **Note:** If get compiling error about `likely` and `unlikely` macros, please install Ubuntu 18.04. Our test uses Ubuntu 18.04 64 bit with kernel v4.15.
 
 * Install `bcc` from https://github.com/iovisor/bcc .
 
