@@ -1,16 +1,8 @@
 #!/usr/bin/python
 
 from bcc import BPF
-from pyroute2 import IPRoute
-from prometheus_client import start_http_server, Summary
-from prometheus_client import Gauge
 from influxdb import InfluxDBClient
-from ipaddress import IPv4Address
-import time
-import json
 import threading
-import sys
-import argparse
 import ctypes as ct
 
 class InDBCollector(object):

@@ -1,23 +1,9 @@
 #!/usr/bin/python
-
-from bcc import BPF
-from pyroute2 import IPRoute
-from prometheus_client import start_http_server, Summary
-from prometheus_client import Gauge
-from ipaddress import IPv4Address
-import time
-import json
-import threading
-import sys
-import argparse
-import ctypes as ct
 from InDBCollector import InDBCollector
-from influxdb import InfluxDBClient
 
 from libc.stdint cimport uintptr_t
 import pyximport; pyximport.install()
 from cy_line_protocol import make_line
-
 
 # change array len of sw_ids.. to .. tx_utilizes to match with max_int_hop in the collector
 cdef enum: __MAX_INT_HOP = 6

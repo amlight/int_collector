@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import argparse
+import threading
+import time
 
 # we parse argument first to decide whether or not importing cython module
 parser = argparse.ArgumentParser(description='InfluxBD client.')
@@ -21,25 +23,13 @@ parser.add_argument("-d", "--debug_mode", default=0, type=int,
     help="Set to 1 to print event")
 args = parser.parse_args()
 
-from bcc import BPF
-from pyroute2 import IPRoute
-from prometheus_client import start_http_server, Summary
-from prometheus_client import Gauge
-from influxdb import InfluxDBClient
-
-from ipaddress import IPv4Address
-import threading
-import time
-import json
-import multiprocessing
-import sys
-import ctypes as ct
 
 if args.perf == False:
     from InDBCollector import InDBCollector
 else:
     import pyximport; pyximport.install()
     from cy_InDBCollector import Cy_InDBCollector, _MAX_INT_HOP
+
 
 if __name__ == "__main__":
 

@@ -1,16 +1,8 @@
 #!/usr/bin/python
 
 from bcc import BPF
-from pyroute2 import IPRoute
 from prometheus_client import start_http_server, Summary
 from prometheus_client import Gauge
-# from collections import defaultdict
-import time
-# import netifaces
-# import sys
-# import os
-# import json
-# import ipaddress
 import argparse
 import ctypes as ct
 
