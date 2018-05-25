@@ -37,9 +37,12 @@ cdef struct Event:
 class Cy_InDBCollector(InDBCollector):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, host="localhost", database="INTdatabase"):
+    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, int_time=False,
+                    host="localhost", database="INTdatabase"):
         super(Cy_InDBCollector, self).__init__(max_int_hop=max_int_hop,
                 int_dst_port=int_dst_port, debug_mode=debug_mode, host=host, database=database)
+
+        self.int_time=int_time
 
     def int_2_ip4_str(self, ipint):
             cdef unsigned char i
@@ -64,11 +67,10 @@ class Cy_InDBCollector(InDBCollector):
                                                             self.int_2_ip4_str(event.dst_ip),
                                                             event.dst_port,
                                                             event.ip_proto),
-                                          key_val_list=[("flow_latency" , event.flow_latency),
+                                            key_val_list=[("flow_latency" , event.flow_latency),
                                                         ("path"         , path_str)],
-                                          time=None 
-                                          # time=event.flow_sink_time, 
-                                         ))
+                                            time=event.flow_sink_time if self.int_time else None
+                                            ))
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
@@ -80,40 +82,36 @@ class Cy_InDBCollector(InDBCollector):
                                                                 event.dst_port,
                                                                 event.ip_proto,
                                                                 event.sw_ids[i]),
-                                  key_val_list=[("value", event.hop_latencies[i])],
-                                  time=None 
-                                  # time=event.egr_times[i], 
-                                 ))
+                                    key_val_list=[("value", event.hop_latencies[i])],
+                                    time=event.egr_times[i] if self.int_time else None
+                                    ))
 
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_tx_utilize >> i) & 0x01):
                         event_data.append(make_line(measurement="port_tx_utilize,sw_id=%d,port_id=%d" % (
                                                            event.sw_ids[i], event.e_port_ids[i]),
-                                  key_val_list=[("value", event.tx_utilizes[i])],
-                                  time=None 
-                                  # time=event.egr_times[i], 
-                                 ))
+                                    key_val_list=[("value", event.tx_utilizes[i])],
+                                    time=event.egr_times[i] if self.int_time else None
+                                    ))
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_queue_occup >> i) & 0x01):
                         event_data.append(make_line(measurement="queue_occupancy,sw_id=%d,queue_id=%d" % (
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                  key_val_list=[("value", event.queue_occups[i])],
-                                  time=None 
-                                  # time=event.egr_times[i],, 
-                                 ))
+                                    key_val_list=[("value", event.queue_occups[i])],
+                                    time=event.egr_times[i] if self.int_time else None
+                                    ))
 
             if event.is_queue_congest:
                 for i in range(0, event.num_INT_hop):
                     if ((event.is_queue_congest >> i) & 0x01):
                         event_data.append(make_line(measurement="queue_congestion,sw_id=%d,queue_id=%d" % (
                                                             event.sw_ids[i], event.queue_ids[i]),
-                                  key_val_list=[("value", event.queue_congests[i])],
-                                  time=None 
-                                  # time=event.egr_times[i], 
-                                 ))
+                                    key_val_list=[("value", event.queue_congests[i])],
+                                    time=event.egr_times[i] if self.int_time else None
+                                    ))
 
             # self.client.write_points(points=event_data)
             self.lock.acquire()
@@ -165,38 +163,33 @@ class Cy_InDBCollector(InDBCollector):
                                                     flow_id.ip_proto)
 
             data.append(make_line(measurement="flow_stat,%s" % flow_id_str,
-                                  key_val_list=[("flow_latency" , flow_info.flow_latency),
-                                                ("path"         , path_str)],
-                                  time=None 
-                                  # time=flow_info.flow_sink_time, 
-                                 ))
+                                key_val_list=[("flow_latency" , flow_info.flow_latency),
+                                            ("path"         , path_str)],
+                                time=flow_info.flow_sink_time if self.int_time else None
+                                ))
             
             if flow_info.is_hop_latency:
                 for i in range(0, flow_info.num_INT_hop):
                     data.append(make_line(measurement="flow_hop_latency,%s,sw_id=%d" %(flow_id_str, flow_info.sw_ids[i]),
-                                  key_val_list=[("value", flow_info.hop_latencies[i])],
-                                  time=None 
-                                  # time=flow_info.egr_times[i], 
-                                 ))
+                                        key_val_list=[("value", flow_info.hop_latencies[i])],
+                                        time=flow_info.egr_times[i] if self.int_time else None
+                                        ))
 
         for (egr_id, egr_info) in self.tb_egr.items():
             data.append(make_line(measurement="port_tx_utilize,sw_id=%d,port_id=%d" % (egr_id.sw_id, egr_id.p_id),
-                                  key_val_list=[("value", egr_info.tx_utilize)],
-                                  time=None 
-                                  # time=egr_info.egr_time, 
-                                 ))
+                                key_val_list=[("value", egr_info.tx_utilize)],
+                                time=egr_info.egr_time if self.int_time else None
+                                ))
 
         for (queue_id, queue_info) in self.tb_queue.items():
             data.append(make_line(measurement="queue_occupancy,sw_id=%d,queue_id=%d" % (queue_id.sw_id, queue_id.q_id),
-                                  key_val_list=[("value", queue_info.occup)],
-                                  time=None 
-                                  # time=queue_info.q_time, 
-                                 ))
+                                key_val_list=[("value", queue_info.occup)],
+                                time=queue_info.q_time if self.int_time else None
+                                ))
 
             data.append(make_line(measurement="queue_congestion,sw_id=%d,queue_id=%d" % (queue_id.sw_id, queue_id.q_id),
-                                  key_val_list=[("value", queue_info.congest)],
-                                  time=None 
-                                  # time=queue_info.q_time, 
-                                 ))
+                                key_val_list=[("value", queue_info.congest)],
+                                time=queue_info.q_time if self.int_time else None
+                                ))
 
         return data

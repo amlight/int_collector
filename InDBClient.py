@@ -5,23 +5,36 @@ import time
 
 # we parse argument first to decide whether or not importing cython module
 parser = argparse.ArgumentParser(description='InfluxBD client.')
+
 parser.add_argument("ifaces", nargs='+',
 help="List of ifaces to receive INT reports")
+
 parser.add_argument("-m", "--max_int_hop", default=6, type=int,
     help="MAX INT HOP")
+
 parser.add_argument("-i", "--int_port", default=54321, type=int,
         help="Destination port of INT Telemetry reports")
+
 parser.add_argument("-H", "--host", default="localhost",
     help="InfluxDB server address")
+
 parser.add_argument("-D", "--database", default="INTdatabase",
     help="Database name")
+
 parser.add_argument("--non_perf", action='store_true',
     help="Disable peformance optimization. Use when cannot install cython \
         or cython compiler error")    
+
 parser.add_argument("-p", "--period", default=10, type=int,
     help="Time period to push data in normal condition")
+
 parser.add_argument("-P", "--event_period", default=1, type=float,
     help="Time period to push event data")
+
+parser.add_argument("-t", "--int_time", action='store_true',
+    help="Use INT timestamp instead of local time. Only available for perf mode")
+args = parser.parse_args()
+
 parser.add_argument("-d", "--debug_mode", default=0, type=int,
     help="Set to 1 to print event")
 args = parser.parse_args()
@@ -43,7 +56,7 @@ if __name__ == "__main__":
         
         collector = Cy_InDBCollector(max_int_hop=args.max_int_hop,
             int_dst_port=args.int_port, debug_mode=args.debug_mode,
-            host=args.host, database=args.database)
+            host=args.host, database=args.database, int_time=args.int_time)
 
         protocol = "line" 
 
