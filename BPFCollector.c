@@ -269,17 +269,17 @@ int collector(struct xdp_md *ctx) {
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
 
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
-        return XDP_DROP;
+        return XDP_PASS;
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
 
     if (unlikely(ip->protocol != IPPROTO_UDP))
-        return XDP_DROP;
+        return XDP_PASS;
     struct udphdr *udp;
     CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
 
     if (unlikely(ntohs(udp->dest) != INT_DST_PORT))
-        return XDP_DROP;
+        return XDP_PASS;
     struct telemetry_report_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
