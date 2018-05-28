@@ -120,7 +120,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 9<<16| 10+j, 11+j]
+                    INTdata += [i%16+j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 11+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -165,7 +165,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 4+j]
+                    INTdata += [i%16+j, 4+j, 1524234560]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -173,7 +173,7 @@ if __name__ == "__main__":
                     Ether()/ \
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
-                    INT(insCnt=2, totalHopCnt=n_sw, ins=(1<<7|1<<5)<<8,
+                    INT(insCnt=3, totalHopCnt=n_sw, ins=(1<<7|1<<5|1<<2)<<8,
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_hoplatency.pcap".format(n_sw, n_fl), p)
@@ -184,7 +184,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 4+j]
+                    INTdata += [i%16+j,2<<16|3, 1524234560, 4+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -192,7 +192,7 @@ if __name__ == "__main__":
                     Ether()/ \
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
-                    INT(insCnt=2, totalHopCnt=n_sw, ins=(1<<7|1)<<8,
+                    INT(insCnt=4, totalHopCnt=n_sw, ins=(1<<7|1<<6|1<<2|1)<<8,
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_txutilize.pcap".format(n_sw, n_fl), p)
@@ -203,7 +203,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, (5+j)<<16| 6, (9+i%16)<<16| 10+j]
+                    INTdata += [i%16+j, (5+j)<<16| 6, 1524234560, (5+j)<<16| 10+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -211,7 +211,7 @@ if __name__ == "__main__":
                     Ether()/ \
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
-                    INT(insCnt=3, totalHopCnt=n_sw, ins=(1<<7|1<<4|1<<1)<<8,
+                    INT(insCnt=4, totalHopCnt=n_sw, ins=(1<<7|1<<4|1<<2|1<<1)<<8,
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_qoccup_qcongest.pcap".format(n_sw, n_fl), p)
@@ -222,7 +222,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 9<<16| 10+j, 11+j]
+                    INTdata += [i%16+j, 2<<16| 3, 4+j, (5+j)<<16| 6, 7+j, 1524234560, (5+j)<<16| 10+j, 11+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -255,10 +255,10 @@ if __name__ == "__main__":
                 for l in range(0, TMP/n_event):
                     INTdata = []
                     for j in range(0,n_sw):
-                        addedINT = [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 9<<16| 10+j, 11+j]
+                        addedINT = [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 11+j]
                         if (l < TMP/(n_event*2) and i==0 and j==0):
                             # use j as sw_id to ensure diff switches so that the number of event is correct
-                            addedINT = [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 9<<16| 10+j, 5000]
+                            addedINT = [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 5000]
                         INTdata += addedINT
                     p.append(Ether()/ \
                         IP(tos=0x17<<2)/ \
@@ -284,9 +284,9 @@ if __name__ == "__main__":
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
             INT(insCnt=8, totalHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
-                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1,
-                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1,
-                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1],
+                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1],
                 originDSCP=14)
         
         p1 = Ether()/ \
@@ -297,9 +297,9 @@ if __name__ == "__main__":
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
             INT(insCnt=8, totalHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
-                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1000,
-                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1,
-                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 9<<16| 10, 1],
+                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1000,
+                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1],
                 originDSCP=14)
 
         iface = "vtap0"
