@@ -33,7 +33,6 @@ parser.add_argument("-P", "--event_period", default=1, type=float,
 
 parser.add_argument("-t", "--int_time", action='store_true',
     help="Use INT timestamp instead of local time. Only available for perf mode")
-args = parser.parse_args()
 
 parser.add_argument("-d", "--debug_mode", default=0, type=int,
     help="Set to 1 to print event")
