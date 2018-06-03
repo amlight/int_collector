@@ -320,8 +320,8 @@ int collector(struct xdp_md *ctx) {
     struct flow_info_t flow_info = {
         .src_ip = ntohl(in_ip->saddr),
         .dst_ip = ntohl(in_ip->daddr),
-        .src_port = in_ports->source,
-        .dst_port = in_ports->dest,
+        .src_port = ntohs(in_ports->source),
+        .dst_port = ntohs(in_ports->dest),
         .ip_proto = in_ip->protocol,
 
         .num_INT_hop = INT_md_fix->totalHopCnt,
