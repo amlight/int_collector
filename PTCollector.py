@@ -153,10 +153,10 @@ class PTCollector(object):
                              ("flow_sink_time", ct.c_uint32),
 
                              ("is_n_flow", ct.c_ubyte),
-                             ("is_n_hop_latency", ct.c_ubyte),
-                             ("is_n_queue_occup", ct.c_ubyte),
-                             ("is_n_queue_congest", ct.c_ubyte),
-                             ("is_n_tx_utilize", ct.c_ubyte)
+                             ("is_hop_latency", ct.c_ubyte),
+                             ("is_queue_occup", ct.c_ubyte),
+                             ("is_queue_congest", ct.c_ubyte),
+                             ("is_tx_utilize", ct.c_ubyte)
 
                              # ("is_path", ct.c_ubyte),
                              # ("is_hop_latency", ct.c_ubyte),
@@ -190,7 +190,7 @@ class PTCollector(object):
                                            event.dst_ip, event.src_port, \
                                            event.dst_port, event.ip_proto))
 
-            if event.is_n_hop_latency:
+            if event.is_hop_latency:
                 flow_id = (event.src_ip, event.dst_ip, event.src_port, \
                             event.dst_port, event.ip_proto)
 
@@ -214,27 +214,27 @@ class PTCollector(object):
                                                event.ip_proto, event.sw_ids[i]))
                 
 
-            if event.is_n_tx_utilize:
+            if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_tx_utilize >> i) & 0x01):
+                    if ((event.is_tx_utilize >> i) & 0x01):
                         self.g_tx_utilize.labels(event.sw_ids[i],\
                                                   event.e_port_ids[i]) \
                                         .set_function(self.get_tx_utilize( \
                                                   event.sw_ids[i], \
                                                   event.e_port_ids[i]))
 
-            if event.is_n_queue_occup:
+            if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_queue_occup >> i) & 0x01):
+                    if ((event.is_queue_occup >> i) & 0x01):
                         self.g_queue_occup.labels(event.sw_ids[i],\
                                                   event.queue_ids[i]) \
                                         .set_function(self.get_queue_occup( \
                                                   event.sw_ids[i], \
                                                   event.queue_ids[i]))
 
-            if event.is_n_queue_congest:
+            if event.is_queue_congest:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_n_queue_congest >> i) & 0x01):
+                    if ((event.is_queue_congest >> i) & 0x01):
                         self.g_queue_congest.labels(event.sw_ids[i],\
                                                   event.queue_ids[i]) \
                                         .set_function(self.get_queue_congest( \

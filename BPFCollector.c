@@ -224,20 +224,14 @@ struct flow_info_t {
 
     u8 is_n_flow;
     
-#ifdef USE_PROMETHEUS
-    u8 is_n_hop_latency;
-    u8 is_n_queue_occup;
-    u8 is_n_queue_congest;
-    u8 is_n_tx_utilize;
-#endif
-    
 #ifdef USE_INFLUXDB
     u8 is_flow;
+#endif
+
     u8 is_hop_latency;
     u8 is_queue_occup;
     u8 is_queue_congest;
     u8 is_tx_utilize;
-#endif
 };
 
 BPF_PERF_OUTPUT(events);
@@ -426,20 +420,6 @@ int collector(struct xdp_md *ctx) {
         is_update = 1;
 
         if (is_hop_latencies) {
-#ifdef USE_PROMETHEUS
-            switch (INT_md_fix->totalHopCnt) {
-                case 1: flow_info.is_n_hop_latency = 0x01; break;
-                case 2: flow_info.is_n_hop_latency = 0x03; break;
-                case 3: flow_info.is_n_hop_latency = 0x07; break;
-                case 4: flow_info.is_n_hop_latency = 0x0f; break;
-                case 5: flow_info.is_n_hop_latency = 0x1f; break;
-                case 6: flow_info.is_n_hop_latency = 0x3f; break;
-                case 7: flow_info.is_n_hop_latency = 0x7f; break;
-                case 8: flow_info.is_n_hop_latency = 0xff; break;
-                default: break;
-            }
-#endif
-#ifdef USE_INFLUXDB
             switch (INT_md_fix->totalHopCnt) {
                 case 1: flow_info.is_hop_latency = 0x01; break;
                 case 2: flow_info.is_hop_latency = 0x03; break;
@@ -451,7 +431,6 @@ int collector(struct xdp_md *ctx) {
                 case 8: flow_info.is_hop_latency = 0xff; break;
                 default: break;
             }
-#endif
         }
 
         // flow_info.pkt_cnt++;
@@ -484,12 +463,7 @@ int collector(struct xdp_md *ctx) {
                 flow_info.is_flow = 1;
 #endif
                 if (is_hop_latencies) {
-#ifdef USE_PROMETHEUS
-                    flow_info.is_n_hop_latency |= 1 << i;
-#endif
-#ifdef USE_INFLUXDB
                     flow_info.is_hop_latency |= 1 << i;
-#endif
                 }
             }
 
@@ -546,12 +520,7 @@ int collector(struct xdp_md *ctx) {
             egr_info_p = tb_egr.lookup(&egr_id);
             if(unlikely(!egr_info_p)) {
 
-#ifdef USE_PROMETHEUS
-                flow_info.is_n_tx_utilize |= 1 << i;
-#endif
-#ifdef USE_INFLUXDB
                 flow_info.is_tx_utilize |= 1 << i;
-#endif
                 is_update = 1; 
             } 
             else {
@@ -602,18 +571,10 @@ int collector(struct xdp_md *ctx) {
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
 
-#ifdef USE_PROMETHEUS
-                if (is_queue_occups)
-                    flow_info.is_n_queue_occup |= 1 << i;
-                if (is_queue_congests)
-                    flow_info.is_n_queue_congest |= 1 << i;
-#endif
-#ifdef USE_INFLUXDB
                 if (is_queue_occups)
                     flow_info.is_queue_occup |= 1 << i;
                 if (is_queue_congests)
                     flow_info.is_queue_congest |= 1 << i;
-#endif
 
                 is_update = 1;
 
@@ -647,15 +608,11 @@ int collector(struct xdp_md *ctx) {
 
 
     // submit event info to user space
-    if (unlikely(flow_info.is_n_flow
-#ifdef USE_PROMETHEUS
-        | flow_info.is_n_hop_latency | flow_info.is_n_queue_occup |
-        flow_info.is_n_queue_congest | flow_info.is_n_tx_utilize
-#endif
+    if (unlikely(flow_info.is_n_flow | 
+        flow_info.is_hop_latency | flow_info.is_queue_occup |
+        flow_info.is_queue_congest | flow_info.is_tx_utilize
 #ifdef USE_INFLUXDB
-        | flow_info.is_flow | flow_info.is_hop_latency |
-        flow_info.is_queue_occup | flow_info.is_queue_congest |
-        flow_info.is_tx_utilize
+        | flow_info.is_flow
 #endif
         )
     )
