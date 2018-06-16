@@ -17,18 +17,28 @@
 // possible-to-compare-ifdef-values-for-conditional-use
 #define INT_DST_PORT _INT_DST_PORT
 #define MAX_INT_HOP _MAX_INT_HOP
-#define SERVER_MODE _SERVER_MODE
 
+#define SERVER_MODE _SERVER_MODE
 #define PROMETHEUS 1
 #define INFLUXDB 2
-
 #if SERVER_MODE == INFLUXDB
     #define USE_INFLUXDB
 #endif
-
 #if SERVER_MODE == PROMETHEUS
     #define USE_PROMETHEUS
 #endif
+
+
+#define EVENT_MODE _EVENT_MODE
+#define INTERVAL 1
+#define THRESHOLD 2
+#if EVENT_MODE == INTERVAL
+    #define USE_INTERVAL
+#endif
+#if EVENT_MODE == THRESHOLD
+    #define USE_THRESHOLD
+#endif
+
 
 #define TO_EGRESS 0
 #define TO_INGRESS 1
@@ -44,9 +54,29 @@
 #define INT_TAIL_SIZE 4
 
 
+#ifdef USE_THRESHOLD
+// TODO: set these values from use space
+#define HOP_LATENCY 50
+#define FLOW_LATENCY 50
+#define QUEUE_OCCUP 50
+#define QUEUE_CONGEST 50
+#define TX_UTILIZE 50
+#define TIME_GAP_W 100 //ns
 
+// Threshold only for influxDB
+#ifdef USE_PROMETHEUS
+#error Threshold only for InfluxDB
+#endif
+#endif
 
+// Default to use interval
+#ifndef USE_THRESHOLD
+#ifndef USE_INTERVAL
+#define USE_INTERVAL
+#endif
+#endif
 
+#ifdef USE_INTERVAL
 // TODO: set these values from use space
 #define HOP_LATENCY 6 // 64
 #define FLOW_LATENCY 6
@@ -54,6 +84,7 @@
 #define QUEUE_CONGEST 6
 #define TX_UTILIZE 6
 #define TIME_GAP_W 100 //ns
+#endif
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
     ({  _target = _cursor; _cursor += _len; \
@@ -63,6 +94,7 @@
 	({  _cursor += _len; \
   		if(unlikely(_cursor > _data_end)) return XDP_DROP; })
 
+#define ABS(a, b) ((a>b)? (a-b):(b-a))
 //--------------------------------------------------------------------
 // Protocols
     struct ports_t {
@@ -386,17 +418,6 @@ int collector(struct xdp_md *ctx) {
     // struct INT_tail_t *INT_tail;
     CURSOR_ADVANCE_NO_PARSE(cursor, INT_TAIL_SIZE, data_end);
 
-
-    /*
-        Store data and event detection. New event when: 
-        - New data
-        - Path change
-        - Value out of interval. For easy implementation, the 
-        interval is power of 2. E.g., for hop latency, the interval
-        is 2**HOP_LATENCY. If HOP_LATENCY shift is 6, interval is
-        64 (0-64, 64-128, 128-192, etc.)
-    */
-
     // Assume that sw_id is alway presented.
     if (unlikely(!is_sw_ids)) return XDP_DROP;
 
@@ -426,9 +447,10 @@ int collector(struct xdp_md *ctx) {
                 case 3: flow_info.is_hop_latency = 0x07; break;
                 case 4: flow_info.is_hop_latency = 0x0f; break;
                 case 5: flow_info.is_hop_latency = 0x1f; break;
-                case 6: flow_info.is_hop_latency = 0x3f; break;
-                case 7: flow_info.is_hop_latency = 0x7f; break;
-                case 8: flow_info.is_hop_latency = 0xff; break;
+                case 6: flow_info.is_hop_latency = 0x3f; break; 
+                // MAX 6 for now
+                // case 7: flow_info.is_hop_latency = 0x7f; break;
+                // case 8: flow_info.is_hop_latency = 0xff; break;
                 default: break;
             }
         }
@@ -438,19 +460,32 @@ int collector(struct xdp_md *ctx) {
 
     } else {
 
+#ifdef USE_INTERVAL
         if (flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time) {
                 is_update = 1;
             }
 
-            if (is_hop_latencies &&
-                flow_info.flow_latency >> FLOW_LATENCY != 
-                flow_info_p->flow_latency >> FLOW_LATENCY) {
-                
+        if (is_hop_latencies &
+            flow_info.flow_latency >> FLOW_LATENCY != 
+            flow_info_p->flow_latency >> FLOW_LATENCY) {
+            
 #ifdef USE_INFLUXDB
-                flow_info.is_flow = 1;
+            flow_info.is_flow = 1;
 #endif
-                is_update = 1;
-            }
+            is_update = 1;
+        }
+#endif
+
+#ifdef USE_THRESHOLD
+        // only need periodically push for flow info, so we can know the live status of the flow
+        if ((flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time) 
+            | (is_hop_latencies & (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY))
+            ) {
+            
+            flow_info.is_flow = 1;
+            is_update = 1;
+        }
+#endif
 
         num_INT_hop = INT_md_fix->totalHopCnt;
         #pragma unroll
@@ -467,10 +502,21 @@ int collector(struct xdp_md *ctx) {
                 }
             }
 
+#ifdef USE_INTERVAL
 #ifdef USE_INFLUXDB
-            if (unlikely(is_hop_latencies && 
+            if (unlikely(is_hop_latencies & 
                     (flow_info.hop_latencies[i] >> HOP_LATENCY != 
                     flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
+                
+                flow_info.is_hop_latency |= 1 << i;
+                is_update = 1;
+            }
+#endif
+#endif
+
+#ifdef USE_THRESHOLD
+            if (unlikely(is_hop_latencies & 
+                (ABS(flow_info.hop_latencies[i], flow_info_p->hop_latencies[i]) > HOP_LATENCY))) {
                 
                 flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
@@ -505,7 +551,7 @@ int collector(struct xdp_md *ctx) {
     num_INT_hop = INT_md_fix->totalHopCnt;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-        if (is_in_e_port_ids && is_tx_utilizes) {
+        if (is_in_e_port_ids & is_tx_utilizes) {
             if (num_INT_hop <= 0)
                 break;
                       
@@ -522,14 +568,25 @@ int collector(struct xdp_md *ctx) {
 
                 flow_info.is_tx_utilize |= 1 << i;
                 is_update = 1; 
-            } 
+            }
             else {
+
+#ifdef USE_INTERVAL
                 if (egr_info_p->egr_time + TIME_GAP_W < egr_info.egr_time) {
                     is_update = 1;
                 }
 
 #ifdef USE_INFLUXDB
                 if (unlikely(egr_info.tx_utilize >> TX_UTILIZE != egr_info_p->tx_utilize >> TX_UTILIZE)) {
+                    flow_info.is_tx_utilize |= 1 << i;
+                    is_update = 1;
+                }
+#endif
+#endif
+
+#ifdef USE_THRESHOLD
+                if (unlikely(ABS(egr_info.tx_utilize, egr_info_p->tx_utilize) > TX_UTILIZE)) {
+                    
                     flow_info.is_tx_utilize |= 1 << i;
                     is_update = 1;
                 }
@@ -579,6 +636,8 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
 
             } else {
+
+#ifdef USE_INTERVAL
                 if (queue_info_p->q_time + TIME_GAP_W < queue_info.q_time) {
                     is_update = 1;
                 }
@@ -593,6 +652,20 @@ int collector(struct xdp_md *ctx) {
                 if (unlikely(is_queue_congests & 
                     (queue_info.congest >> QUEUE_CONGEST != queue_info_p->congest >> QUEUE_CONGEST))) {
                     
+                    flow_info.is_queue_congest |= 1 << i;
+                    is_update = 1;
+                }
+#endif
+#endif
+
+#ifdef USE_THRESHOLD
+
+                if (unlikely(is_queue_occups & (ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP))) {
+                    flow_info.is_queue_occup |= 1 << i;
+                    is_update = 1;
+                }
+
+                if (unlikely(is_queue_congests & (ABS(queue_info.congest, queue_info_p->congest) > QUEUE_CONGEST))) {                    
                     flow_info.is_queue_congest |= 1 << i;
                     is_update = 1;
                 }
@@ -618,6 +691,6 @@ int collector(struct xdp_md *ctx) {
     )
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
 
-
+DROP:
 	return XDP_DROP;
 }

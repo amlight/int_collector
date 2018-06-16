@@ -9,12 +9,14 @@ import ctypes as ct
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, host="localhost", database="INTdatabase"):
+    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, host="localhost",
+        database="INTdatabase", event_mode="INTERVAL"):
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
         self.SERVER_MODE = "INFLUXDB"
         self.INT_DST_PORT = int_dst_port
+        self.EVENT_MODE = event_mode
 
         self.ifaces = set()
 
@@ -23,6 +25,7 @@ class InDBCollector(object):
             cflags=["-w", 
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
                     "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
+                    "-D_EVENT_MODE=%s" % self.EVENT_MODE,
                     "-D_SERVER_MODE=%s" % self.SERVER_MODE])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
