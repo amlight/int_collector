@@ -3,7 +3,6 @@ from InDBCollector import InDBCollector
 
 from libc.stdint cimport uintptr_t
 import pyximport; pyximport.install()
-from cy_line_protocol import make_line
 
 # change array len of sw_ids.. to .. tx_utilizes to match with max_int_hop in the collector
 cdef enum: __MAX_INT_HOP = 6
