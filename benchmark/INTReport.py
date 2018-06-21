@@ -58,8 +58,12 @@ if __name__ == "__main__":
         help="Gen pcaps for Test 3")    
     parser.add_argument("-t4", "--test4", action='store_true',
         help="Gen pcaps for Test 4")    
-    parser.add_argument("-t5", "--test_out_of_interval", action='store_true',
+    parser.add_argument("-t5", "--test_event_detection", action='store_true',
         help="Test out of interval")    
+    parser.add_argument("-t6", "--test_onos_collector", action='store_true',
+        help="Test collector from ONOS P4 group")
+    parser.add_argument("-t7", "--test_event_correctness", action='store_true',
+        help="Test the correctness of event detection")    
     args = parser.parse_args()
 
     # p_3sw_8d = []
@@ -84,7 +88,7 @@ if __name__ == "__main__":
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
                     INT(insCnt=1, totalHopCnt=n_sw, ins=(1<<7)<<8, \
-                        INTMetadata=[i%4+j for j in range(0,6)], \
+                        INTMetadata=[j for j in range(0,6)], \
                         originDSCP=14))
             wrpcap("pcaps/t1_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
             print "Done: t1_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
@@ -110,7 +114,7 @@ if __name__ == "__main__":
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
                     INT(insCnt=1, totalHopCnt=n_sw, ins=(1<<7)<<8, \
-                        INTMetadata=[i%16+j for j in range(0,n_sw)], \
+                        INTMetadata=[j for j in range(0,n_sw)], \
                         originDSCP=14))
             wrpcap("pcaps/t2_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
             print "Done: t2_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
@@ -120,7 +124,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 11+j]
+                    INTdata += [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 11+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -155,7 +159,7 @@ if __name__ == "__main__":
                     IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256))/ \
                     UDP(sport=5000, dport=5000)/ \
                     INT(insCnt=1, totalHopCnt=n_sw, ins=(1<<7)<<8, \
-                        INTMetadata=[i%16+j for j in range(0,n_sw)], \
+                        INTMetadata=[j for j in range(0,n_sw)], \
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
             print "Done: t3_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
@@ -165,7 +169,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 4+j, 1524234560]
+                    INTdata += [j, 4+j, 1524234560]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -184,7 +188,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j,2<<16|3, 1524234560, 4+j]
+                    INTdata += [j,2<<16|3, 1524234560, 4+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -203,7 +207,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, (5+j)<<16| 6, 1524234560, (5+j)<<16| 10+j]
+                    INTdata += [j, (5+j)<<16| 6, 1524234560, (5+j)<<16| 10+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -222,7 +226,7 @@ if __name__ == "__main__":
             for i in range(0, n_fl):
                 INTdata = []
                 for j in range(0,n_sw):
-                    INTdata += [i%16+j, 2<<16| 3, 4+j, (5+j)<<16| 6, 7+j, 1524234560, (5+j)<<16| 10+j, 11+j]
+                    INTdata += [j, 2<<16| 3, 4+j, (5+j)<<16| 6, 7+j, 1524234560, (5+j)<<16| 10+j, 11+j]
                 p.append(Ether()/ \
                     IP(tos=0x17<<2)/ \
                     UDP(sport=5000, dport=54321)/ \
@@ -244,7 +248,7 @@ if __name__ == "__main__":
     if args.test4:
         n_sw = 3
         n_fl = 100
-        n_events = [20, 50, 100, 200, 500]
+        n_events = [20, 50, 100, 200, 500, 1000]
         TMP = 1000000*2/100
         for n_event in n_events:
             # all fields
@@ -274,8 +278,8 @@ if __name__ == "__main__":
             print "Done: t4_{0}sw_{1}fl_{2}event_all.pcap".format(n_sw, n_fl, n_event)
 
     
-    # test out of gap detection
-    if args.test_out_of_interval:
+    # test event_detection
+    if args.test_event_detection:
         p0 = Ether()/ \
             IP(tos=0x17<<2)/ \
             UDP(sport=5000, dport=54321)/ \
@@ -284,7 +288,7 @@ if __name__ == "__main__":
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
             INT(insCnt=8, totalHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
-                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                INTMetadata= [4, 2<<16| 3, 400, 5<<16| 600, 700, 1524234560, 5<<16| 1000, 1,
                 5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
                 6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1],
                 originDSCP=14)
@@ -313,3 +317,83 @@ if __name__ == "__main__":
         
         except KeyboardInterrupt:
             pass
+        
+    # test onos collector
+    if args.test_onos_collector:
+        p0 = Ether(dst="52:54:00:d5:81:bb")/ \
+            IP(tos=0x17<<2, dst="192.168.122.191")/ \
+            UDP(sport=5000, dport=1234)/ \
+            TelemetryReport(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.1", dst="10.0.0.2", tos=0x1<<2)/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT(insCnt=8, totalHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1],
+                originDSCP=14)
+        
+
+        # wrpcap("pcaps/test_onos_collector.pcap", p0*10)
+
+        # iface = "vnet0"
+        # try:
+        #     while 1:
+        #         sendp(p0, iface=iface)
+        #         time.sleep(1)
+        
+        # except KeyboardInterrupt:
+        #     pass
+    
+        n_sws = [5]
+        n_fl = 10
+        for n_sw in n_sws:
+            # all fields
+            p=[]
+            for i in range(0, n_fl):
+                INTdata = []
+                for j in range(0,n_sw):
+                    INTdata += [j, 2<<16| 3, 4+j, 5<<16| 6, 7+j, 1524234560, 5<<16| 10+j, 11+j]
+                p.append(Ether(dst="52:54:00:d5:81:bb")/ \
+                    IP(tos=0x17<<2, dst="192.168.122.191")/ \
+                    UDP(sport=5000, dport=1234)/ \
+                    TelemetryReport(ingressTimestamp= 1524138290)/ \
+                    Ether()/ \
+                    IP(src="10.0.0.1", dst="10.0.{0}.{1}".format(i/256, i%256), tos=0x1<<2)/ \
+                    UDP(sport=5000, dport=5000)/ \
+                    INT(insCnt=8, totalHopCnt=n_sw, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+                        INTMetadata= INTdata,
+                        originDSCP=14))
+            wrpcap("pcaps/t6_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl), p)
+            print "Done: t6_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl)
+
+
+    # test event_detection
+    if args.test_event_correctness:
+        p = []
+        n_sw = 3
+        lats = [200, 202, 196, 223, 212, 215, 198, 218, 186, 186, 202, 186, 202, 221, 185, 225, 186, 269, 211, 196, 252, 239, 193, 209, 235, 192, 756, 465, 488, 484, 490, 452, 438, 483, 448, 439, 439, 465, 458, 351, 249, 213, 249, 213, 186, 187, 199, 245, 206, 199, 225, 398, 233, 300, 241, 205, 199, 248, 215, 234, 226, 239, 193, 193, 185, 203, 186, 190, 185, 184, 246, 218, 182, 234, 229, 249, 209, 247, 250, 195, 201, 239, 222, 234, 272, 247, 213, 171, 182, 239, 174, 832, 224, 234, 238, 230, 238, 192, 222, 232]
+        
+        for i, lat in enumerate(lats):
+            INTdata = [4, 40, (i+1)*1e6, 5, 41, (i+1)*1e6, 6, lat, (i+1)*1e6]
+            p.append(Ether()/ \
+                        IP(tos=0x17<<2)/ \
+                        UDP(sport=5000, dport=54321)/ \
+                        TelemetryReport(ingressTimestamp= 1524138290)/ \
+                        Ether()/ \
+                        IP(src="10.0.0.1", dst="10.0.0.2")/ \
+                        UDP(sport=5000, dport=5000)/ \
+                        INT(insCnt=3, totalHopCnt=n_sw, ins=(1<<7|1<<5|1<<2)<<8,
+                            INTMetadata= INTdata,
+                            originDSCP=14))
+        
+
+        iface = "vtap0"
+
+        # for p0 in p:
+        #   sendp(p0, iface=iface)
+        #         time.sleep(0.1)
+
+        
+        wrpcap("pcaps/t7.pcap", p)
+        print "Done: t7.pcap"
