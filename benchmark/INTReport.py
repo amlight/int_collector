@@ -8,14 +8,18 @@ class TelemetryReport(Packet):
     name = "INT telemetry report"
     
     # default value a for telemetry report with INT
-    fields_desc = [ BitField("ver" , 1 , 4),
-        BitField("nProto", 0, 4),
+    fields_desc = [ 
+        BitField("ver" , 1 , 4),
+        BitField("len" , 1 , 4),
+        BitField("nProto", 0, 3),
+        BitField("repMdBits", 0, 6),
+        BitField("reserved", None, 6),
         BitField("d", 0, 1),
         BitField("q", 0, 1),
         BitField("f", 1, 1),
-        BitField("reserved", None, 15),
         BitField("hw_id", None, 6),
 
+        IntField("swid", None),
         IntField("seqNumber", None),
         IntField("ingressTimestamp", None) ]
 
@@ -390,10 +394,10 @@ if __name__ == "__main__":
 
         iface = "vtap0"
 
-        # for p0 in p:
-        #   sendp(p0, iface=iface)
-        #         time.sleep(0.1)
+        for p0 in p:
+            sendp(p0, iface=iface)
+            time.sleep(1)
 
         
-        wrpcap("pcaps/t7.pcap", p)
-        print "Done: t7.pcap"
+        # wrpcap("pcaps/t7.pcap", p)
+        # print "Done: t7.pcap"

@@ -110,27 +110,30 @@ struct eth_tp {
 
 struct telemetry_report_t {
 #if defined(__BIG_ENDIAN_BITFIELD)
-    u8  ver:4,
-        nProto:4;
-    u8  d:1,
+    u32 ver:4,
+        len:4,
+        nProto:3,
+        repMdBits:6,
+        reserved:6,
+        d:1,
         q:1,
         f:1,
-        rsvd1:5;
-    u16 rsvd2:10,
         hw_id:6;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-    u8  nProto:4,
-        ver:4;
-    u8  rsvd1:5,
+    u32 hw_id:6,
         f:1,
         q:1,
-        d:1;
-    u16 hw_id:6,
-        rsvd2:10;  
+        d:1,
+        reserved:6,
+        repMdBits:6,
+        nProto:3,
+        len:4,
+        ver:4;
 #else
 #error  "Please fix <asm/byteorder.h>"
 #endif
 
+    u32 sw_id;
     u32 seqNumber;
     u32 ingressTimestamp;
 } __attribute__((packed));
