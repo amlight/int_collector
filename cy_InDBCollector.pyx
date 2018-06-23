@@ -37,7 +37,7 @@ class Cy_InDBCollector(InDBCollector):
     """docstring for InDBCollector"""
 
     def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, int_time=False,
-                    host="localhost", database="INTdatabase",event_mode="INTERVAL"):
+                    host="localhost", database="INTdatabase",event_mode="THRESHOLD"):
         super(Cy_InDBCollector, self).__init__(max_int_hop=max_int_hop,
                 int_dst_port=int_dst_port, debug_mode=debug_mode, host=host,
                 database=database, event_mode=event_mode)

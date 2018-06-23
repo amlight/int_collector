@@ -34,7 +34,7 @@ parser.add_argument("-P", "--event_period", default=1, type=float,
 parser.add_argument("-t", "--int_time", action='store_true',
     help="Use INT timestamp instead of local time. Only available for perf mode")
 
-parser.add_argument("-e", "--event_mode", default="INTERVAL",
+parser.add_argument("-e", "--event_mode", default="THRESHOLD",
     help="Event detection mode: INTERVAL or THRESHOLD. Period push will be disabled.")
 
 parser.add_argument("-d", "--debug_mode", default=0, type=int,

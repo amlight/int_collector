@@ -10,7 +10,7 @@ class InDBCollector(object):
     """docstring for InDBCollector"""
 
     def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, host="localhost",
-        database="INTdatabase", event_mode="INTERVAL"):
+        database="INTdatabase", event_mode="THRESHOLD"):
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = max_int_hop
