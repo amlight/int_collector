@@ -46,8 +46,8 @@ class PTCollector(object):
             ['sw_id', 'p_id'])      
         self.g_queue_occup = Gauge('queue_occup', 'queue occupancy',
             ['sw_id', 'q_id'])
-        self.g_queue_congest = Gauge('queue_congest', 'queue congestion',
-            ['sw_id', 'q_id'])
+        # self.g_queue_congest = Gauge('queue_congest', 'queue congestion',
+        #     ['sw_id', 'q_id'])
     
     def attach_iface(self, iface):
         if iface in self.ifaces:
@@ -116,12 +116,12 @@ class PTCollector(object):
             return val.occup
         return _get_queue_occup
 
-    def get_queue_congest(self, sw_id, q_id):
-        def _get_queue_congest():
-            key = self.tb_queue.Key(sw_id, q_id)
-            val = self.tb_queue[key]
-            return val.congest
-        return _get_queue_congest
+    # def get_queue_congest(self, sw_id, q_id):
+    #     def _get_queue_congest():
+    #         key = self.tb_queue.Key(sw_id, q_id)
+    #         val = self.tb_queue[key]
+    #         return val.congest
+    #     return _get_queue_congest
 
         
     def open_events(self):
@@ -146,7 +146,7 @@ class PTCollector(object):
                              ("queue_occups", ct.c_uint16 * self.MAX_INT_HOP),
                              # ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("egr_times", ct.c_uint32 * self.MAX_INT_HOP),
-                             ("queue_congests", ct.c_uint16 * self.MAX_INT_HOP),
+                             ("lv2_in_e_port_ids", ct.c_uint32 * self.MAX_INT_HOP),
                              ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
 
                              ("flow_latency", ct.c_uint32),
@@ -155,7 +155,7 @@ class PTCollector(object):
                              ("is_n_flow", ct.c_ubyte),
                              ("is_hop_latency", ct.c_ubyte),
                              ("is_queue_occup", ct.c_ubyte),
-                             ("is_queue_congest", ct.c_ubyte),
+                             # ("is_queue_congest", ct.c_ubyte),
                              ("is_tx_utilize", ct.c_ubyte)
 
                              # ("is_path", ct.c_ubyte),
@@ -232,14 +232,14 @@ class PTCollector(object):
                                                   event.sw_ids[i], \
                                                   event.queue_ids[i]))
 
-            if event.is_queue_congest:
-                for i in range(0, event.num_INT_hop):
-                    if ((event.is_queue_congest >> i) & 0x01):
-                        self.g_queue_congest.labels(event.sw_ids[i],\
-                                                  event.queue_ids[i]) \
-                                        .set_function(self.get_queue_congest( \
-                                                  event.sw_ids[i], \
-                                                  event.queue_ids[i]))
+            # if event.is_queue_congest:
+            #     for i in range(0, event.num_INT_hop):
+            #         if ((event.is_queue_congest >> i) & 0x01):
+            #             self.g_queue_congest.labels(event.sw_ids[i],\
+            #                                       event.queue_ids[i]) \
+            #                             .set_function(self.get_queue_congest( \
+            #                                       event.sw_ids[i], \
+            #                                       event.queue_ids[i]))
 
             
             # Print event data for debug

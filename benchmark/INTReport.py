@@ -3,9 +3,9 @@ from scapy.all import *
 import time
 import argparse
 
-class TelemetryReport(Packet):
+class TelemetryReport_v10(Packet):
 
-    name = "INT telemetry report"
+    name = "INT telemetry report v1.0"
     
     # default value a for telemetry report with INT
     fields_desc = [ 
@@ -23,10 +23,54 @@ class TelemetryReport(Packet):
         IntField("seqNumber", None),
         IntField("ingressTimestamp", None) ]
 
+class TelemetryReport(Packet):
+
+    name = "INT telemetry report v0.5"
+    
+    # default value a for telemetry report with INT
+    fields_desc = [ BitField("ver" , 1 , 4),
+        BitField("nProto", 0, 4),
+        BitField("d", 0, 1),
+        BitField("q", 0, 1),
+        BitField("f", 1, 1),
+        BitField("reserved", None, 15),
+        BitField("hw_id", None, 6),
+
+        IntField("seqNumber", None),
+        IntField("ingressTimestamp", None) ]
+
+
+
+class INT_v10(Packet):
+
+    name = "INT v1.0"
+
+    fields_desc = [ 
+        XByteField("type", 1),
+        XByteField("shimRsvd1", None),
+        XByteField("length", None),
+        BitField("dscp", None, 6),
+        BitField("shimRsvd2", None, 2),
+
+        BitField("ver", 0, 4),
+        BitField("rep", 0, 2),
+        BitField("c", 0, 1),
+        BitField("e", 0, 1),
+        BitField("m", 0, 1),
+        BitField("rsvd1", 0, 7),
+        BitField("rsvd2", 0, 3),
+        BitField("hopMLen", None, 5),
+        XByteField("remainHopCnt", None),
+
+        XShortField("ins", None),
+        XShortField("res", 0),
+
+        FieldListField("INTMetadata", [], XIntField("", None), count_from=lambda p:p.length - 2)
+        ]
 
 class INT(Packet):
 
-    name = "INT"
+    name = "INT v0.5"
 
     fields_desc = [ XByteField("type", 1),
         XByteField("shimRsvd1", None),
@@ -67,7 +111,9 @@ if __name__ == "__main__":
     parser.add_argument("-t6", "--test_onos_collector", action='store_true',
         help="Test collector from ONOS P4 group")
     parser.add_argument("-t7", "--test_event_correctness", action='store_true',
-        help="Test the correctness of event detection")    
+        help="Test the correctness of event detection")
+    parser.add_argument("-t8", "--test_v10_spec", action='store_true',
+        help="Test v1.0 spec implementation")
     args = parser.parse_args()
 
     # p_3sw_8d = []
@@ -401,3 +447,44 @@ if __name__ == "__main__":
         
         # wrpcap("pcaps/t7.pcap", p)
         # print "Done: t7.pcap"
+
+
+    # test v1.0 spec impelementation
+    if args.test_v10_spec:
+        p0 = Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport_v10(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.1", dst="10.0.0.2")/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT_v10(length=26, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+                INTMetadata= [4, 2<<16| 3, 400, 5<<16| 600, 700, 1524234560, 5<<16| 1000, 1,
+                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1]
+            )
+        
+        p1 = Ether()/ \
+            IP(tos=0x17<<2)/ \
+            UDP(sport=5000, dport=54321)/ \
+            TelemetryReport_v10(ingressTimestamp= 1524138290)/ \
+            Ether()/ \
+            IP(src="10.0.0.1", dst="10.0.0.2")/ \
+            UDP(sport=5000, dport=5000)/ \
+            INT_v10(length=26, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+                INTMetadata= [4, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1000,
+                5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1,
+                6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234560, 5<<16| 10, 1]
+            )
+
+        iface = "vtap0"
+
+        try:
+            while 1:
+                sendp(p0, iface=iface)
+                time.sleep(2)
+                sendp(p1, iface=iface)
+                time.sleep(2)
+        
+        except KeyboardInterrupt:
+            pass

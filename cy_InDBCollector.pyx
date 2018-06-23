@@ -22,7 +22,7 @@ cdef struct Event:
     unsigned short queue_occups[__MAX_INT_HOP]
     # unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
-    unsigned short queue_congests[__MAX_INT_HOP]
+    unsigned int   lv2_in_e_port_ids[__MAX_INT_HOP]
     unsigned int   tx_utilizes[__MAX_INT_HOP]
     unsigned int   flow_latency
     unsigned int   flow_sink_time
@@ -30,7 +30,7 @@ cdef struct Event:
     unsigned char  is_flow
     unsigned char  is_hop_latency
     unsigned char  is_queue_occup
-    unsigned char  is_queue_congest
+    # unsigned char  is_queue_congest
     unsigned char  is_tx_utilize
 
 class Cy_InDBCollector(InDBCollector):
@@ -98,12 +98,12 @@ class Cy_InDBCollector(InDBCollector):
                                         event.sw_ids[i], event.queue_ids[i], event.queue_occups[i],
                                         ' %d' % event.egr_times[i] if self.int_time else ''))
 
-            if event.is_queue_congest:
-                for i in range(0, event.num_INT_hop):
-                    if ((event.is_queue_congest >> i) & 0x01):
-                        event_data.append("queue_congestion\\,sw_id\\=%d\\,queue_id\\=%d value=%d%s" % (
-                                    event.sw_ids[i], event.queue_ids[i], event.queue_congests[i],
-                                    ' %d' % event.egr_times[i] if self.int_time else ''))
+            # if event.is_queue_congest:
+            #     for i in range(0, event.num_INT_hop):
+            #         if ((event.is_queue_congest >> i) & 0x01):
+            #             event_data.append("queue_congestion\\,sw_id\\=%d\\,queue_id\\=%d value=%d%s" % (
+            #                         event.sw_ids[i], event.queue_ids[i], event.queue_congests[i],
+            #                         ' %d' % event.egr_times[i] if self.int_time else ''))
 
             # self.client.write_points(points=event_data)
             self.lock.acquire()
@@ -127,7 +127,7 @@ class Cy_InDBCollector(InDBCollector):
                 print "queue_occups", event.queue_occups
                 # print "ingr_times", event.ingr_times
                 print "egr_times", event.egr_times
-                print "queue_congests", event.queue_congests
+                print "lv2_in_e_port_ids", event.lv2_in_e_port_ids
                 print "tx_utilizes", event.tx_utilizes
                 print "flow_latency", event.flow_latency
                 print "flow_sink_time", event.flow_sink_time
@@ -135,7 +135,7 @@ class Cy_InDBCollector(InDBCollector):
                 print "is_flow", event.is_flow
                 print "is_hop_latency", event.is_hop_latency
                 print "is_queue_occup", event.is_queue_occup
-                print "is_queue_congest", event.is_queue_congest
+                # print "is_queue_congest", event.is_queue_congest
                 print "is_tx_utilize", event.is_tx_utilize
                 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
@@ -174,8 +174,8 @@ class Cy_InDBCollector(InDBCollector):
                     queue_id.sw_id, queue_id.q_id, queue_info.occup,
                     ' %d' % queue_info.q_time if self.int_time else ''))
 
-            data.append("queue_congestion\\,sw_id\\=%d\\,queue_id\\=%d value=%d%s" % (
-                    queue_id.sw_id, queue_id.q_id, queue_info.congest,
-                    ' %d' % queue_info.q_time if self.int_time else ''))
+            # data.append("queue_congestion\\,sw_id\\=%d\\,queue_id\\=%d value=%d%s" % (
+            #         queue_id.sw_id, queue_id.q_id, queue_info.congest,
+            #         ' %d' % queue_info.q_time if self.int_time else ''))
 
         return data

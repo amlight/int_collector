@@ -86,7 +86,7 @@ class InDBCollector(object):
                              ("queue_occups", ct.c_uint16 * self.MAX_INT_HOP),
                              # ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("egr_times", ct.c_uint32 * self.MAX_INT_HOP),
-                             ("queue_congests", ct.c_uint16 * self.MAX_INT_HOP),
+                             ("lv2_in_e_port_ids", ct.c_uint32 * self.MAX_INT_HOP),
                              ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
 
                              ("flow_latency", ct.c_uint32),
@@ -101,7 +101,7 @@ class InDBCollector(object):
                              ("is_flow", ct.c_ubyte),
                              ("is_hop_latency", ct.c_ubyte),
                              ("is_queue_occup", ct.c_ubyte),
-                             ("is_queue_congest", ct.c_ubyte),
+                             # ("is_queue_congest", ct.c_ubyte),
                              ("is_tx_utilize", ct.c_ubyte)
                              ]
 
@@ -167,16 +167,16 @@ class InDBCollector(object):
                                             }
                                         })
 
-            if event.is_queue_congest:
-                for i in range(0, event.num_INT_hop):
-                    if ((event.is_queue_congest >> i) & 0x01):
-                        event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
-                                                            event.sw_ids[i], event.queue_ids[i]),
-                                            "time": event.egr_times[i],
-                                            "fields": {
-                                                "value": event.queue_congests[i]
-                                            }
-                                        })
+            # if event.is_queue_congest:
+            #     for i in range(0, event.num_INT_hop):
+            #         if ((event.is_queue_congest >> i) & 0x01):
+            #             event_data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
+            #                                                 event.sw_ids[i], event.queue_ids[i]),
+            #                                 "time": event.egr_times[i],
+            #                                 "fields": {
+            #                                     "value": event.queue_congests[i]
+            #                                 }
+            #                             })
 
             # self.client.write_points(points=event_data)
             self.lock.acquire()
@@ -191,6 +191,7 @@ class InDBCollector(object):
                     if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
                                     "queue_occups", "queue_ids","egr_times",
                                     "queue_congests","tx_utilizes"]:
+
                         _len = len(field_arr)
                         s = ""
                         for e in field_arr:
@@ -262,13 +263,13 @@ class InDBCollector(object):
                             }
                         })
 
-            data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
-                                        queue_id.sw_id, queue_id.q_id),
-                            "time": queue_info.q_time,
-                            "fields": {
-                                "value": queue_info.congest
-                            }
-                        })
+            # data.append({"measurement": "queue_congestion,sw_id={0},queue_id={1}".format(
+            #                             queue_id.sw_id, queue_id.q_id),
+            #                 "time": queue_info.q_time,
+            #                 "fields": {
+            #                     "value": queue_info.congest
+            #                 }
+            #             })
 
 
         return data
