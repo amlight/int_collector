@@ -4,9 +4,9 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
 `BPFCollector` use [eBPF](https://www.iovisor.org/technology/ebpf) and [XDP](https://www.iovisor.org/technology/xdp), which require recent linux kernel. For best practice, kernel version >= v4.14 should be used.
 # Installation
 
-* Install Ubuntu VM with kernel version >= 4.14. **Note:** If get compiling error about `likely` and `unlikely` macros, please install Ubuntu 18.04. Our test uses Ubuntu 18.04 64 bit with kernel v4.15.
+* Install Ubuntu VM. We only tested INTCollector with Ubuntu 17.10/18.04 64 bit with kernel v4.15.
 
-* Install `bcc` from https://github.com/iovisor/bcc .
+* Install pre-built `bcc` package from https://github.com/iovisor/bcc . The pre-built package works ok for Ubuntu 18.04.
 
 * Clone this repo:
 
@@ -14,13 +14,7 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
     $ git clone https://gitlab.com/tunv_ebpf/BPFCollector.git
  ```
 
-* Install required python modules. There may be other missing modules beside `pyroute2`:
-
- ``` shell
-    $ pip install pyroute2
- ```
-
-* Install Prometheus and/or InfluxDB python client libraries, depending on the choice of the server:
+* Install Prometheus and/or InfluxDB python client libraries, depending on the choice of the server. There may be other missing modules, also install them with `pip` :
 
  ``` shell
     $ pip install prometheus_client
