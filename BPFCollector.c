@@ -246,7 +246,7 @@ struct flow_info_t {
     u32 hop_latencies[MAX_INT_HOP];
     u16 queue_ids[MAX_INT_HOP];
     u16 queue_occups[MAX_INT_HOP];
-    u32 ingr_times[MAX_INT_HOP];
+    // u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
     u16 queue_congests[MAX_INT_HOP];
     u32 tx_utilizes[MAX_INT_HOP];
@@ -356,26 +356,26 @@ int collector(struct xdp_md *ctx) {
 
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
-    u8 is_sw_ids 		 = (INT_ins >> 15) & 0x01;
-    u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x01;
-    u8 is_hop_latencies  = (INT_ins >> 13) & 0x01;
-    u8 is_queue_occups 	 = (INT_ins >> 12) & 0x01;
-    u8 is_ingr_times 	 = (INT_ins >> 11) & 0x01;
-    u8 is_egr_times 	 = (INT_ins >> 10) & 0x01;
-    u8 is_queue_congests = (INT_ins >> 9) & 0x01;
-    u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x01;
+    // Assume that sw_id is alway presented.
+    if ((INT_ins >> 15) & 0x01 != 1) return XDP_DROP;
+    
+    u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x1;
+    u8 is_hop_latencies  = (INT_ins >> 13) & 0x1;
+    u8 is_queue_occups 	 = (INT_ins >> 12) & 0x1;
+    u8 is_ingr_times 	 = (INT_ins >> 11) & 0x1;
+    u8 is_egr_times 	 = (INT_ins >> 10) & 0x1;
+    u8 is_queue_congests = (INT_ins >> 9) & 0x1;
+    u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x1;
 
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-
-        if (likely(is_sw_ids)) {
-            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.sw_ids[i] = ntohl(INT_data->data);
-        }
+        CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
+        flow_info.sw_ids[i] = ntohl(INT_data->data);
+        
         if (is_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.in_port_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
-            flow_info.e_port_ids[i] = ntohl(INT_data->data) & 0xff;
+            flow_info.in_port_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
+            flow_info.e_port_ids[i] = ntohl(INT_data->data) & 0xffff;
         }
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -384,12 +384,14 @@ int collector(struct xdp_md *ctx) {
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
-            flow_info.queue_occups[i] = ntohl(INT_data->data) & 0xff;
+            flow_info.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
+            flow_info.queue_occups[i] = ntohl(INT_data->data) & 0xffff;
         }
         if (is_ingr_times) {
-            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.ingr_times[i] = ntohl(INT_data->data);
+            // we dont use ingr_times for now
+            // CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
+            // flow_info.ingr_times[i] = ntohl(INT_data->data);
+            CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*INT_data), data_end);
         }
         if (is_egr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -397,8 +399,8 @@ int collector(struct xdp_md *ctx) {
         }
         if (is_queue_congests) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xff;
-            flow_info.queue_congests[i] = ntohl(INT_data->data) & 0xff;
+            flow_info.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
+            flow_info.queue_congests[i] = ntohl(INT_data->data) & 0xffff;
         }
         if (is_tx_utilizes) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -417,9 +419,6 @@ int collector(struct xdp_md *ctx) {
     // parse INT tail
     // struct INT_tail_t *INT_tail;
     CURSOR_ADVANCE_NO_PARSE(cursor, INT_TAIL_SIZE, data_end);
-
-    // Assume that sw_id is alway presented.
-    if (unlikely(!is_sw_ids)) return XDP_DROP;
 
     /*
         Path store and change-detection

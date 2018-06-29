@@ -84,7 +84,7 @@ class InDBCollector(object):
                              ("hop_latencies", ct.c_uint32 * self.MAX_INT_HOP),
                              ("queue_ids", ct.c_uint16 * self.MAX_INT_HOP),
                              ("queue_occups", ct.c_uint16 * self.MAX_INT_HOP),
-                             ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
+                             # ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("egr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("queue_congests", ct.c_uint16 * self.MAX_INT_HOP),
                              ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
@@ -189,7 +189,7 @@ class InDBCollector(object):
                 for field_name, field_type in event._fields_:
                     field_arr = getattr(event, field_name)
                     if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
-                                    "queue_occups", "queue_ids","ingr_times","egr_times",
+                                    "queue_occups", "queue_ids","egr_times",
                                     "queue_congests","tx_utilizes"]:
                         _len = len(field_arr)
                         s = ""

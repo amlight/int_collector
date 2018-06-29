@@ -2,6 +2,7 @@
 import argparse
 import threading
 import time
+import sys
 
 # we parse argument first to decide whether or not importing cython module
 parser = argparse.ArgumentParser(description='InfluxBD client.')
@@ -127,8 +128,11 @@ if __name__ == "__main__":
 
     # Start polling events
     collector.open_events()
+    
+    print "eBPF progs Loaded"
+    sys.stdout.flush()
+
     try:
-        print "eBPF progs Loaded"
         while 1:
             collector.poll_events()
 

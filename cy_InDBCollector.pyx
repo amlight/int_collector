@@ -20,7 +20,7 @@ cdef struct Event:
     unsigned int   hop_latencies[__MAX_INT_HOP]
     unsigned short queue_ids[__MAX_INT_HOP]
     unsigned short queue_occups[__MAX_INT_HOP]
-    unsigned int   ingr_times[__MAX_INT_HOP]
+    # unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
     unsigned short queue_congests[__MAX_INT_HOP]
     unsigned int   tx_utilizes[__MAX_INT_HOP]
@@ -125,7 +125,7 @@ class Cy_InDBCollector(InDBCollector):
                 print "hop_latencies", event.hop_latencies
                 print "queue_ids", event.queue_ids
                 print "queue_occups", event.queue_occups
-                print "ingr_times", event.ingr_times
+                # print "ingr_times", event.ingr_times
                 print "egr_times", event.egr_times
                 print "queue_congests", event.queue_congests
                 print "tx_utilizes", event.tx_utilizes
