@@ -1,4 +1,3 @@
-
 # BPFCollector
 A high-performance collector to process INT Telemetry reports, and send data to database servers such as Prometheus and InfluxDB.
 Currently, BPFCollector supports [Telemetry report v1.0](https://github.com/p4lang/p4-applications/tree/master/docs), and [INT spec v1.0](https://github.com/p4lang/p4-applications/tree/master/docs) with TCP/UDP encapsulation.
