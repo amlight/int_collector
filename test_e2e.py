@@ -24,6 +24,7 @@ def start_client(cmd):
 
     p = subp.stdout.readline()
     assert p == "eBPF progs Loaded\n", "Error loading XDP program"
+    time.sleep(0.5)
         
 @pytest.fixture
 def setup_veth():
