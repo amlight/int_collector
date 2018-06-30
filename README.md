@@ -68,4 +68,9 @@ Currently, BPFCollector supports [Telemetry report v0.5](https://github.com/p4la
 
 > If InfluxDB server does not run in the same machine as the collector, we need to specify the server address with `-H` option when running `InDBClient.py`.
 
-
+## Test
+End to end tests for InfluxDB only. InfluxDB needs to run in localhost. 
+``` shell
+    $ pip install pytest
+    $ sudo pytest -v
+```
