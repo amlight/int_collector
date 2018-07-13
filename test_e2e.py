@@ -23,7 +23,8 @@ def start_client(cmd):
         return None
 
     p = subp.stdout.readline()
-    assert p == "eBPF progs Loaded\n", "Error loading XDP program"
+    assert (subp.poll() == None), "Error loading XDP program"
+
     time.sleep(0.5)
         
 @pytest.fixture
@@ -168,4 +169,3 @@ def test_e2e_indb_interval(setup_veth):
 def test_e2e_indb_non_perf(setup_veth):
     cmd = ["python", "InDBClient.py", "-t", "--non_perf", outif]
     end_to_end_influxdb(cmd)
-# test_end_to_end_influxdb()
