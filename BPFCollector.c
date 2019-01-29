@@ -322,7 +322,7 @@ struct flow_info_t {
     u32 hop_latencies[MAX_INT_HOP];
     u16 queue_ids[MAX_INT_HOP];
     u16 queue_occups[MAX_INT_HOP];
-    // u32 ingr_times[MAX_INT_HOP];
+    u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
     // u16 queue_congests[MAX_INT_HOP];
     u32 lv2_in_e_port_ids[MAX_INT_HOP];
@@ -425,7 +425,7 @@ int collector(struct xdp_md *ctx) {
     // u8 _num_INT_hop = (INT_shim->length - 2)/INT_md_fix->hopMlen;
 
     // Bad way to calculate num_INT_hop ...
-    u8 INT_data_len = INT_shim->length - 2;
+    u8 INT_data_len = INT_shim->length - 3;
     u8 _num_INT_hop = 6; // max
     if((u8)(INT_md_fix->hopMlen << 2) + INT_md_fix->hopMlen == INT_data_len)      _num_INT_hop = 5;
     else if((u8)(INT_md_fix->hopMlen << 2) == INT_data_len)                       _num_INT_hop = 4;
@@ -481,10 +481,8 @@ int collector(struct xdp_md *ctx) {
             flow_info.queue_occups[i] = ntohl(INT_data->data) & 0xffff;
         }
         if (is_ingr_times) {
-            // we dont use ingr_times for now
-            // CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            // flow_info.ingr_times[i] = ntohl(INT_data->data);
-            CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*INT_data), data_end);
+            CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
+            flow_info.ingr_times[i] = ntohl(INT_data->data);
         }
         if (is_egr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
