@@ -126,7 +126,7 @@ struct telemetry_report_t {
         q:1,
         d:1;
     u16 hw_id:6,
-        rsvd2:10;  
+        rsvd2:10;
 #else
 #error  "Please fix <asm/byteorder.h>"
 #endif
@@ -332,7 +332,7 @@ struct flow_info_t {
     u32 flow_sink_time;
 
     u8 is_n_flow;
-    
+
 #ifdef USE_INFLUXDB
     u8 is_flow;
 #endif
@@ -365,7 +365,7 @@ int collector(struct xdp_md *ctx) {
 
     /*
         Parse outer: Ether->IP->UDP->TelemetryReport.
-    */  
+    */
 
     struct eth_tp *eth;
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
@@ -388,26 +388,26 @@ int collector(struct xdp_md *ctx) {
 
 
     /*
-        Parse Inner: Ether->IP->UDP/TCP->INT. 
+        Parse Inner: Ether->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
 
     struct iphdr *in_ip;
-    CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);    
+    CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
 
     struct ports_t *in_ports;
-    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);  
-    
+    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);
+
     // TODO: TCP with option (not fixed header len)?
-    u8 remain_size = (in_ip->protocol == IPPROTO_UDP)? 
-                    (UDPHDR_SIZE - sizeof(*in_ports)) : 
+    u8 remain_size = (in_ip->protocol == IPPROTO_UDP)?
+                    (UDPHDR_SIZE - sizeof(*in_ports)) :
                     (TCPHDR_SIZE - sizeof(*in_ports));
     CURSOR_ADVANCE_NO_PARSE(cursor, remain_size, data_end);
-        
+
     // CURSOR_ADVANCE_NO_PARSE(cursor, INT_SHIM_SIZE, data_end);
-    
+
     struct INT_shim_v10_t *INT_shim;
     CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
 
@@ -420,20 +420,16 @@ int collector(struct xdp_md *ctx) {
         Parse INT data
     */
 
-    // u8 num_INT_hop = INT_md_fix->totalHopCnt;
-    // should use this, but compiled error!
-    // u8 _num_INT_hop = (INT_shim->length - 2)/INT_md_fix->hopMlen;
-
-    // Bad way to calculate num_INT_hop ...
-    u8 INT_data_len = INT_shim->length - 3;
-    u8 _num_INT_hop = 6; // max
-    if((u8)(INT_md_fix->hopMlen << 2) + INT_md_fix->hopMlen == INT_data_len)      _num_INT_hop = 5;
-    else if((u8)(INT_md_fix->hopMlen << 2) == INT_data_len)                       _num_INT_hop = 4;
-    else if((u8)(INT_md_fix->hopMlen << 1) + INT_md_fix->hopMlen == INT_data_len) _num_INT_hop = 3;
-    else if((u8)(INT_md_fix->hopMlen << 1) == INT_data_len)                       _num_INT_hop = 2;
-    else if(INT_md_fix->hopMlen == INT_data_len)                                  _num_INT_hop = 1;
-    else if(0 == INT_data_len)                                                    _num_INT_hop = 0;
-    u8 num_INT_hop = _num_INT_hop;      
+    u8 INT_data_len = INT_shim->length - 3; // 3 is sizeof INT shim and md fix headers in words
+    // should use this but is it slower?
+    // u8 num_INT_hop = INT_data_len/INT_md_fix->hopMlen;
+    u8 num_INT_hop = 6; // max
+    if((u8)(INT_md_fix->hopMlen << 2) + INT_md_fix->hopMlen == INT_data_len)      num_INT_hop = 5;
+    else if((u8)(INT_md_fix->hopMlen << 2) == INT_data_len)                       num_INT_hop = 4;
+    else if((u8)(INT_md_fix->hopMlen << 1) + INT_md_fix->hopMlen == INT_data_len) num_INT_hop = 3;
+    else if((u8)(INT_md_fix->hopMlen << 1) == INT_data_len)                       num_INT_hop = 2;
+    else if(INT_md_fix->hopMlen == INT_data_len)                                  num_INT_hop = 1;
+    else if(0 == INT_data_len)                                                    num_INT_hop = 0;
 
     struct INT_data_t *INT_data;
 
@@ -444,14 +440,14 @@ int collector(struct xdp_md *ctx) {
         .dst_port = ntohs(in_ports->dest),
         .ip_proto = in_ip->protocol,
 
-        .num_INT_hop = _num_INT_hop,
+        .num_INT_hop = num_INT_hop,
         .flow_sink_time = ntohl(tm_rp->ingressTimestamp)
     };
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
     // Assume that sw_id is alway presented.
     if ((INT_ins >> 15) & 0x01 != 1) return XDP_DROP;
-    
+
     u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x1;
     u8 is_hop_latencies  = (INT_ins >> 13) & 0x1;
     u8 is_queue_occups 	 = (INT_ins >> 12) & 0x1;
@@ -460,11 +456,12 @@ int collector(struct xdp_md *ctx) {
     u8 is_lv2_in_e_port_ids = (INT_ins >> 9) & 0x1;
     u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x1;
 
+    u8 _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.sw_ids[i] = ntohl(INT_data->data);
-        
+
         if (is_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             flow_info.in_port_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
@@ -498,9 +495,9 @@ int collector(struct xdp_md *ctx) {
         }
 
         // no need for the final round
-        if (i < MAX_INT_HOP - 1) {      
-            num_INT_hop--;
-            if (num_INT_hop <= 0)
+        if (i < MAX_INT_HOP - 1) {
+            _num_INT_hop--;
+            if (_num_INT_hop <= 0)
                 break;
         }
     }
@@ -525,18 +522,18 @@ int collector(struct xdp_md *ctx) {
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
     if (unlikely(!flow_info_p)) {
-        
+
         flow_info.is_n_flow = 1;
         is_update = 1;
 
         if (is_hop_latencies) {
-            switch (_num_INT_hop) {
+            switch (num_INT_hop) {
                 case 1: flow_info.is_hop_latency = 0x01; break;
                 case 2: flow_info.is_hop_latency = 0x03; break;
                 case 3: flow_info.is_hop_latency = 0x07; break;
                 case 4: flow_info.is_hop_latency = 0x0f; break;
                 case 5: flow_info.is_hop_latency = 0x1f; break;
-                case 6: flow_info.is_hop_latency = 0x3f; break; 
+                case 6: flow_info.is_hop_latency = 0x3f; break;
                 // MAX 6 for now
                 // case 7: flow_info.is_hop_latency = 0x7f; break;
                 // case 8: flow_info.is_hop_latency = 0xff; break;
@@ -555,9 +552,9 @@ int collector(struct xdp_md *ctx) {
             }
 
         if (is_hop_latencies &
-            flow_info.flow_latency >> FLOW_LATENCY != 
+            flow_info.flow_latency >> FLOW_LATENCY !=
             flow_info_p->flow_latency >> FLOW_LATENCY) {
-            
+
 #ifdef USE_INFLUXDB
             flow_info.is_flow = 1;
 #endif
@@ -567,20 +564,19 @@ int collector(struct xdp_md *ctx) {
 
 #ifdef USE_THRESHOLD
         // only need periodically push for flow info, so we can know the live status of the flow
-        if ((flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time) 
+        if ((flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time)
             | (is_hop_latencies & (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY))
             ) {
-            
+
             flow_info.is_flow = 1;
             is_update = 1;
         }
 #endif
 
-        // num_INT_hop = INT_md_fix->totalHopCnt;
-        num_INT_hop = _num_INT_hop;
+        _num_INT_hop = num_INT_hop;
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
-            
+
 
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
@@ -594,10 +590,10 @@ int collector(struct xdp_md *ctx) {
 
 #ifdef USE_INTERVAL
 #ifdef USE_INFLUXDB
-            if (unlikely(is_hop_latencies & 
-                    (flow_info.hop_latencies[i] >> HOP_LATENCY != 
+            if (unlikely(is_hop_latencies &
+                    (flow_info.hop_latencies[i] >> HOP_LATENCY !=
                     flow_info_p->hop_latencies[i] >> HOP_LATENCY))) {
-                
+
                 flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
             }
@@ -605,18 +601,18 @@ int collector(struct xdp_md *ctx) {
 #endif
 
 #ifdef USE_THRESHOLD
-            if (unlikely(is_hop_latencies & 
+            if (unlikely(is_hop_latencies &
                 (ABS(flow_info.hop_latencies[i], flow_info_p->hop_latencies[i]) > HOP_LATENCY))) {
-                
+
                 flow_info.is_hop_latency |= 1 << i;
                 is_update = 1;
             }
 #endif
 
             // no need for the final round
-            if (i < MAX_INT_HOP - 1) {      
-                num_INT_hop--;
-                if (num_INT_hop <= 0)
+            if (i < MAX_INT_HOP - 1) {
+                _num_INT_hop--;
+                if (_num_INT_hop <= 0)
                     break;
             }
         }
@@ -638,16 +634,16 @@ int collector(struct xdp_md *ctx) {
     struct egr_id_t egr_id = {};
     struct egr_info_t egr_info;
 
-    num_INT_hop = _num_INT_hop;
+    _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
         if (is_in_e_port_ids & is_tx_utilizes) {
-            if (num_INT_hop <= 0)
+            if (_num_INT_hop <= 0)
                 break;
-                      
+
             egr_id.sw_id  = flow_info.sw_ids[i];
             egr_id.p_id = flow_info.e_port_ids[i];
-          
+
             egr_info.egr_time    = flow_info.egr_times[i];
             egr_info.tx_utilize  = flow_info.tx_utilizes[i];
 
@@ -657,7 +653,7 @@ int collector(struct xdp_md *ctx) {
             if(unlikely(!egr_info_p)) {
 
                 flow_info.is_tx_utilize |= 1 << i;
-                is_update = 1; 
+                is_update = 1;
             }
             else {
 
@@ -676,7 +672,7 @@ int collector(struct xdp_md *ctx) {
 
 #ifdef USE_THRESHOLD
                 if (unlikely(ABS(egr_info.tx_utilize, egr_info_p->tx_utilize) > TX_UTILIZE)) {
-                    
+
                     flow_info.is_tx_utilize |= 1 << i;
                     is_update = 1;
                 }
@@ -686,7 +682,7 @@ int collector(struct xdp_md *ctx) {
             if (is_update)
                 tb_egr.update(&egr_id, &egr_info);
 
-            num_INT_hop--;
+            _num_INT_hop--;
         }
     }
 
@@ -694,21 +690,21 @@ int collector(struct xdp_md *ctx) {
     /*
         Queue info
     */
-    
+
     struct queue_info_t *queue_info_p;
     struct queue_id_t queue_id = {};
     struct queue_info_t queue_info = {};
 
-    num_INT_hop = _num_INT_hop;
+    _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
         if (is_queue_occups) {
-            if (num_INT_hop <= 0)
+            if (_num_INT_hop <= 0)
                 break;
-                      
+
             queue_id.sw_id = flow_info.sw_ids[i];
             queue_id.q_id = flow_info.queue_ids[i];
-          
+
             queue_info.occup = flow_info.queue_occups[i];
             queue_info.q_time = flow_info.egr_times[i];
 
@@ -716,7 +712,7 @@ int collector(struct xdp_md *ctx) {
 
             queue_info_p = tb_queue.lookup(&queue_id);
             if(unlikely(!queue_info_p)) {
-                
+
                 flow_info.is_queue_occup |= 1 << i;
                 is_update = 1;
 
@@ -729,7 +725,7 @@ int collector(struct xdp_md *ctx) {
 
 #ifdef USE_INFLUXDB
                 if (unlikely(queue_info.occup >> QUEUE_OCCUP != queue_info_p->occup >> QUEUE_OCCUP)) {
-                    
+
                     flow_info.is_queue_occup |= 1 << i;
                     is_update = 1;
                 }
@@ -748,13 +744,13 @@ int collector(struct xdp_md *ctx) {
             if (is_update)
                 tb_queue.update(&queue_id, &queue_info);
 
-            num_INT_hop--;
+            _num_INT_hop--;
         }
     }
 
 
     // submit event info to user space
-    if (unlikely(flow_info.is_n_flow | 
+    if (unlikely(flow_info.is_n_flow |
         flow_info.is_hop_latency | flow_info.is_queue_occup | flow_info.is_tx_utilize
 #ifdef USE_INFLUXDB
         | flow_info.is_flow
