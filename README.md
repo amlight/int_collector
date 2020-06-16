@@ -54,6 +54,6 @@ Currently, BPFCollector supports [Telemetry report v1.0](https://github.com/p4la
 ## Test
 End to end tests for InfluxDB only. InfluxDB needs to run in localhost.
 ``` shell
-    $ pip install pytest
-    $ sudo pytest -v
+    $ sudo pip install pytest
+    $ sudo python -m pytest
 ```
