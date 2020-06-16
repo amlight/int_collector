@@ -5,7 +5,7 @@ Currently, BPFCollector supports [Telemetry report v1.0](https://github.com/p4la
 # Installation
 ## Collector setup
 
-* Install Ubuntu VM. We only tested INTCollector with Ubuntu 17.10/18.04 64 bit with kernel v4.15.
+* Install Ubuntu VM. We only tested INTCollector with Ubuntu 18.04 64 bit with kernel v4.15.
 * Install `bcc` package from https://github.com/iovisor/bcc.
 * Clone this repo
    ``` shell
