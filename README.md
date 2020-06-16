@@ -47,7 +47,6 @@ Currently, BPFCollector supports [Telemetry report v1.0](https://github.com/p4la
 ## Notes
 
 * If InfluxDB server does not run in the same machine as the collector, we need to specify the server address with `-H` option when running `InDBClient.py`.
-* If cannot install `cython` or has cython compiler error with InDBClient, go back to generic mode with `--non_cython` option.
 * Run the collector with `-h` option for more help. If there are any missing libraries, install them using `pip`.
 * INT Telemetry reports in pcap file can be created using `benchmark/INTReport.py`.
 * If there are errors that eBPF program cannot load (such as _cannot allocate memory_), please ensure that the network interfaces the INTCollector listens to has XDP support by current kernel. Check [here](https://github.com/iovisor/bcc/blob/master/docs/kernel-versions.md#xdp).

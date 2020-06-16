@@ -1,8 +1,11 @@
 #!/usr/bin/python
-from InDBCollector import InDBCollector
 
+import threading
+from bcc import BPF
+from influxdb import InfluxDBClient
+from ipaddress import IPv4Address
 from libc.stdint cimport uintptr_t
-import pyximport; pyximport.install()
+
 
 # change array len of sw_ids.. to .. tx_utilizes to match with max_int_hop in the collector
 cdef enum: __MAX_INT_HOP = 6
@@ -33,31 +36,82 @@ cdef struct Event:
     # unsigned char  is_queue_congest
     unsigned char  is_tx_utilize
 
-class Cy_InDBCollector(InDBCollector):
+
+class InDBCollector(object):
     """docstring for InDBCollector"""
 
     def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, int_time=False,
                     host="localhost", database="INTdatabase",event_mode="THRESHOLD"):
-        super(Cy_InDBCollector, self).__init__(max_int_hop=max_int_hop,
-                int_dst_port=int_dst_port, debug_mode=debug_mode, host=host,
-                database=database, event_mode=event_mode)
+        super(InDBCollector, self).__init__()
 
-        self.int_time=int_time
+        self.MAX_INT_HOP = _MAX_INT_HOP
+        self.SERVER_MODE = "INFLUXDB"
+        self.INT_DST_PORT = int_dst_port
+        self.EVENT_MODE = event_mode
+        self.int_time = int_time
+
+        self.ifaces = set()
+
+        #load eBPF program
+        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
+            cflags=["-w",
+                    "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
+                    "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
+                    "-D_EVENT_MODE=%s" % self.EVENT_MODE,
+                    "-D_SERVER_MODE=%s" % self.SERVER_MODE])
+        self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
+
+        # get all the info table
+        self.tb_flow  = self.bpf_collector.get_table("tb_flow")
+        self.tb_egr   = self.bpf_collector.get_table("tb_egr")
+        self.tb_queue = self.bpf_collector.get_table("tb_queue")
+
+        self.flow_paths = {}
+
+        self.lock = threading.Lock()
+        self.event_data = []
+
+        self.client = InfluxDBClient(host=host, database=database)
+
+        self.debug_mode = debug_mode
+
+
+    def attach_iface(self, iface):
+        if iface in self.ifaces:
+            print "already attached to ", iface
+            return
+        self.bpf_collector.attach_xdp(iface, self.fn_collector, 0)
+        self.ifaces.add(iface)
+
+    def detach_iface(self, iface):
+        if iface not in self.ifaces:
+            print "no program attached to ", iface
+            return
+        self.bpf_collector.remove_xdp(iface, 0)
+        self.ifaces.remove(iface)
+
+    def detach_all_iface(self):
+        for iface in self.ifaces:
+            self.bpf_collector.remove_xdp(iface, 0)
+        self.ifaces = set()
 
     def int_2_ip4_str(self, ipint):
-            cdef unsigned char i
-            return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
+        cdef unsigned char i
+        return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
+
+    def poll_events(self):
+        self.bpf_collector.kprobe_poll()
 
     def open_events(self):
         def _process_event(ctx, data, size):
-            
+
             cdef uintptr_t _event =  <uintptr_t> data
             cdef Event *event = <Event*> _event
 
             # push data
-            
+
             event_data = []
-            
+
             if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
 
@@ -105,7 +159,6 @@ class Cy_InDBCollector(InDBCollector):
             #                         event.sw_ids[i], event.queue_ids[i], event.queue_congests[i],
             #                         ' %d' % event.egr_times[i] if self.int_time else ''))
 
-            # self.client.write_points(points=event_data)
             self.lock.acquire()
             self.event_data.extend(event_data)
             self.lock.release()
@@ -137,7 +190,7 @@ class Cy_InDBCollector(InDBCollector):
                 print "is_queue_occup", event.is_queue_occup
                 # print "is_queue_congest", event.is_queue_congest
                 print "is_tx_utilize", event.is_tx_utilize
-                
+
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
 
 
@@ -147,7 +200,7 @@ class Cy_InDBCollector(InDBCollector):
 
         for (flow_id, flow_info) in self.tb_flow.iteritems():
             path_str = ":".join(str(flow_info.sw_ids[i]) for i in reversed(range(0, flow_info.num_INT_hop)))
-            
+
             flow_id_str = "%s:%d->%s:%d\\,proto\\=%d" % (self.int_2_ip4_str(flow_id.src_ip), \
                                                     flow_id.src_port, \
                                                     self.int_2_ip4_str(flow_id.dst_ip), \
@@ -157,7 +210,7 @@ class Cy_InDBCollector(InDBCollector):
             data.append("flow_stat\\,%s flow_latency=%d,path=\"%s\"%s" % (
                     flow_id_str, flow_info.flow_latency, path_str,
                     ' %d' % flow_info.flow_sink_time if self.int_time else ''))
-            
+
             if flow_info.is_hop_latency:
                 for i in range(0, flow_info.num_INT_hop):
                     data.append("flow_hop_latency\\,%s\\,sw_id\\=%d value=%d%s" % (
