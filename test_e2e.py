@@ -52,7 +52,7 @@ def end_to_end_influxdb_v10(cmd):
             Ether()/ \
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
-            INT_v10(length=26, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+            INT_v10(length=27, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
                 INTMetadata= [4, 5<<16| 3, 400, 5<<16| 600, 700, 1524234560, 5<<16| 1000, 1,
                 5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234561, 5<<16| 10, 1,
                 6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234562, 5<<16| 10, 1]
@@ -65,7 +65,7 @@ def end_to_end_influxdb_v10(cmd):
             Ether()/ \
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
-            INT_v10(length=26, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+            INT_v10(length=27, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
                 INTMetadata= [4, 5<<16| 3, 400, 5<<16| 600, 700, 1524234561, 5<<16| 1000, 1,
                 5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234562, 5<<16| 10, 1,
                 6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234563, 5<<16| 10, 1]
@@ -78,7 +78,7 @@ def end_to_end_influxdb_v10(cmd):
             Ether()/ \
             IP(src="10.0.0.1", dst="10.0.0.2")/ \
             UDP(sport=5000, dport=5000)/ \
-            INT_v10(length=26, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
+            INT_v10(length=27, hopMLen=8, remainHopCnt=3, ins=(1<<7|1<<6|1<<5|1<<4|1<<3|1<<2|1<<1|1)<<8,
                 INTMetadata= [4, 5<<16| 3, 4, 5<<16| 6, 7, 1524234570, 5<<16| 10, 1000,
                 5, 2<<16| 3, 4, 5<<16| 6, 7, 1524234571, 5<<16| 10, 1,
                 6, 2<<16| 3, 4, 5<<16| 6, 7, 1524234572, 5<<16| 10, 1]
@@ -153,4 +153,4 @@ def test_e2e_indb_interval_v10(setup_veth):
     end_to_end_influxdb_v10(cmd)
 
 def test_e2e_indb_non_perf_v10(setup_veth):
-    cmd = ["python", "InDBClient.py", "-t", "--non_perf", outif]
+    cmd = ["python", "InDBClient.py", "-t", "--non_cython", outif]
