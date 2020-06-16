@@ -33,7 +33,7 @@ parser.add_argument("-P", "--event_period", default=1, type=float,
     help="Time period to push event data")
 
 parser.add_argument("-t", "--int_time", action='store_true',
-    help="Use INT timestamp instead of local time. Only available for perf mode")
+    help="Use INT timestamp instead of local time. Disabled when use --non_cython")
 
 parser.add_argument("-e", "--event_mode", default="THRESHOLD",
     help="Event detection mode: INTERVAL or THRESHOLD. Option -p is disabled for THRESHOLD and is hard-coded instead")
