@@ -6,7 +6,7 @@ import ctypes as ct
 
 class PTCollector(object):
     """docstring for PTCollector"""
-    
+
     def __init__(self, max_int_hop=6, int_dst_port=54321, debug_mode=0):
         super(PTCollector, self).__init__()
 
@@ -18,12 +18,12 @@ class PTCollector(object):
 
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
-            cflags=["-w", 
+            cflags=["-w",
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
                     "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
                     "-D_SERVER_MODE=%s" % self.SERVER_MODE,])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
-    
+
         # get all the info table
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr")
@@ -35,20 +35,20 @@ class PTCollector(object):
 
         # gauge
         # self.g_flow_pkt_cnt = Gauge('flow_pkt_cnt', 'flow packet count',
-        #     ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])   
+        #     ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
         # self.g_flow_byte_cnt = Gauge('flow_byte_cnt', 'flow byte count',
         #     ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
         self.g_flow_latency = Gauge('flow_latency', 'total flow latency',
-            ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])       
-        self.g_flow_hop_latency = Gauge('flow_hop_latency', 'per-hop latency of flow', 
+            ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto'])
+        self.g_flow_hop_latency = Gauge('flow_hop_latency', 'per-hop latency of flow',
             ['src_ip', 'src_port', 'dst_ip', 'dst_port', 'ip_proto', 'sw_id'])
         self.g_tx_utilize = Gauge('tx_utilize', 'tx link utilization',
-            ['sw_id', 'p_id'])      
+            ['sw_id', 'p_id'])
         self.g_queue_occup = Gauge('queue_occup', 'queue occupancy',
             ['sw_id', 'q_id'])
         # self.g_queue_congest = Gauge('queue_congest', 'queue congestion',
         #     ['sw_id', 'q_id'])
-    
+
     def attach_iface(self, iface):
         if iface in self.ifaces:
             print "already attached to ", iface
@@ -123,7 +123,7 @@ class PTCollector(object):
     #         return val.congest
     #     return _get_queue_congest
 
-        
+
     def open_events(self):
         def _process_event(ctx, data, size):
             class Event(ct.Structure):
@@ -132,7 +132,7 @@ class PTCollector(object):
                              ("src_port", ct.c_ushort),
                              ("dst_port", ct.c_ushort),
                              ("ip_proto", ct.c_ushort),
-                             
+
                              # ("pkt_cnt", ct.c_uint64),
                              # ("byte_cnt", ct.c_uint64),
 
@@ -144,7 +144,7 @@ class PTCollector(object):
                              ("hop_latencies", ct.c_uint32 * self.MAX_INT_HOP),
                              ("queue_ids", ct.c_uint16 * self.MAX_INT_HOP),
                              ("queue_occups", ct.c_uint16 * self.MAX_INT_HOP),
-                             # ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
+                             ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("egr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("lv2_in_e_port_ids", ct.c_uint32 * self.MAX_INT_HOP),
                              ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
@@ -182,7 +182,7 @@ class PTCollector(object):
                 #                    .set_function(self.get_flow_byte_cnt(event.src_ip, \
                 #                            event.dst_ip, event.src_port, \
                 #                            event.dst_port, event.ip_proto))
-                
+
                 self.g_flow_latency.labels(event.src_ip, event.dst_ip, \
                                            event.src_port, event.dst_port, \
                                            event.ip_proto) \
@@ -212,7 +212,7 @@ class PTCollector(object):
                                                event.src_ip, event.dst_ip, \
                                                event.src_port, event.dst_port, \
                                                event.ip_proto, event.sw_ids[i]))
-                
+
 
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
@@ -241,7 +241,7 @@ class PTCollector(object):
             #                                       event.sw_ids[i], \
             #                                       event.queue_ids[i]))
 
-            
+
             # Print event data for debug
             if self.debug_mode==1:
                 print "*" * 20
@@ -253,13 +253,13 @@ class PTCollector(object):
                         _len = len(field_arr)
                         s = ""
                         for e in field_arr:
-                            s = s+str(e)+", " 
+                            s = s+str(e)+", "
                         print field_name+": ", s
                     else:
                         print field_name+": ", field_arr
 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
-    
+
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
 
