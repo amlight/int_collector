@@ -22,7 +22,7 @@ class InDBCollector(object):
 
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
-            cflags=["-w", 
+            cflags=["-w",
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
                     "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
                     "-D_EVENT_MODE=%s" % self.EVENT_MODE,
@@ -63,7 +63,7 @@ class InDBCollector(object):
             self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces = set()
 
-        
+
     def open_events(self):
         def _process_event(ctx, data, size):
             class Event(ct.Structure):
@@ -72,7 +72,7 @@ class InDBCollector(object):
                              ("src_port", ct.c_ushort),
                              ("dst_port", ct.c_ushort),
                              ("ip_proto", ct.c_ushort),
-                             
+
                              # ("pkt_cnt", ct.c_uint64),
                              # ("byte_cnt", ct.c_uint64),
 
@@ -84,7 +84,7 @@ class InDBCollector(object):
                              ("hop_latencies", ct.c_uint32 * self.MAX_INT_HOP),
                              ("queue_ids", ct.c_uint16 * self.MAX_INT_HOP),
                              ("queue_occups", ct.c_uint16 * self.MAX_INT_HOP),
-                             # ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
+                             ("ingr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("egr_times", ct.c_uint32 * self.MAX_INT_HOP),
                              ("lv2_in_e_port_ids", ct.c_uint32 * self.MAX_INT_HOP),
                              ("tx_utilizes", ct.c_uint32 * self.MAX_INT_HOP),
@@ -108,9 +108,9 @@ class InDBCollector(object):
             event = ct.cast(data, ct.POINTER(Event)).contents
 
             # push data
-            
+
             event_data = []
-            
+
             if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
                 event_data.append({"measurement": "flow_stat,{0}:{1}->{2}:{3},proto={4}".format(
@@ -195,14 +195,14 @@ class InDBCollector(object):
                         _len = len(field_arr)
                         s = ""
                         for e in field_arr:
-                            s = s+str(e)+", " 
+                            s = s+str(e)+", "
                         print field_name+": ", s
                     else:
                         print field_name+": ", field_arr
 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
 
-    
+
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
 
