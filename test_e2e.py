@@ -151,6 +151,3 @@ def test_e2e_indb_threshold_v10(setup_veth):
 def test_e2e_indb_interval_v10(setup_veth):
     cmd = ["python", "InDBClient.py", "-t", "-e", "INTERVAL", outif]
     end_to_end_influxdb_v10(cmd)
-
-def test_e2e_indb_non_perf_v10(setup_veth):
-    cmd = ["python", "InDBClient.py", "-t", "--non_cython", outif]
