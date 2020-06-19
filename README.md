@@ -55,5 +55,5 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 End to end tests for InfluxDB only. InfluxDB needs to run in localhost.
 ``` shell
    sudo pip3 install pytest
-   sudo python3 -m pytest
+   sudo python3 -m pytest -v
 ```

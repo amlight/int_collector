@@ -1,8 +1,10 @@
+from __future__ import print_function
 import pytest
 import subprocess
 import time
 import os
 import signal
+import sys
 from scapy.all import *
 from influxdb import InfluxDBClient
 
@@ -14,6 +16,7 @@ outif = "int_veth_1"
 subp = None
 test_db = "INT_test_database"
 idbclient = InfluxDBClient(host="localhost", database=test_db)
+python_ver = "python3" if sys.version_info[0] == 3 else "python2"
 
 def start_collector(cmd):
     global subp
@@ -21,7 +24,7 @@ def start_collector(cmd):
         subp = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             universal_newlines=True)
     except Exception as e:
-        print e
+        print(e)
         return None
 
     p = subp.stdout.readline()
@@ -94,61 +97,62 @@ def end_to_end_influxdb_v10(cmd):
         assert len(idbclient.get_list_measurements()) == 10
 
         r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4', None)': [{u'value': 400, u'time': 1524234560}]})"
+        assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4')) == [{u'value': 400, u'time': 1524234560}]
         r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5', None)': [{u'value': 4, u'time': 1524234561}]})"
+        assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5')) == [{u'value': 4, u'time': 1524234561}]
         r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6', None)': [{u'value': 4, u'time': 1524234562}]})"
+        assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6')) == [{u'value': 4, u'time': 1524234562}]
 
         r = idbclient.query("select * from \"port_tx_utilize,sw_id=4,port_id=3\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=4,port_id=3', None)': [{u'value': 1, u'time': 1524234560}]})"
+        assert list(r.get_points('port_tx_utilize,sw_id=4,port_id=3')) == [{u'value': 1, u'time': 1524234560}]
         r = idbclient.query("select * from \"port_tx_utilize,sw_id=5,port_id=3\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=5,port_id=3', None)': [{u'value': 1, u'time': 1524234561}]})"
+        assert list(r.get_points('port_tx_utilize,sw_id=5,port_id=3')) == [{u'value': 1, u'time': 1524234561}]
         r = idbclient.query("select * from \"port_tx_utilize,sw_id=6,port_id=3\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=6,port_id=3', None)': [{u'value': 1, u'time': 1524234562}]})"
+        assert list(r.get_points('port_tx_utilize,sw_id=6,port_id=3')) == [{u'value': 1, u'time': 1524234562}]
 
         r = idbclient.query("select * from \"queue_occupancy,sw_id=4,queue_id=5\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=4,queue_id=5', None)': [{u'value': 600, u'time': 1524234560}]})"
+        assert list(r.get_points('queue_occupancy,sw_id=4,queue_id=5')) == [{u'value': 600, u'time': 1524234560}]
         r = idbclient.query("select * from \"queue_occupancy,sw_id=5,queue_id=5\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=5,queue_id=5', None)': [{u'value': 6, u'time': 1524234561}]})"
+        assert list(r.get_points('queue_occupancy,sw_id=5,queue_id=5')) == [{u'value': 6, u'time': 1524234561}]
         r = idbclient.query("select * from \"queue_occupancy,sw_id=6,queue_id=5\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=6,queue_id=5', None)': [{u'value': 6, u'time': 1524234562}]})"
+        assert list(r.get_points('queue_occupancy,sw_id=6,queue_id=5')) == [{u'value': 6, u'time': 1524234562}]
 
         r = idbclient.query("select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\"", epoch='ns')
-        assert str(r) == "ResultSet({'(u'flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17', None)': [{u'path': u'6:5:4', u'flow_latency': 408, u'time': 1524138290}]})"
+        assert list(r.get_points('flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17')) == [{u'path': u'6:5:4', u'flow_latency': 408, u'time': 1524138290}]
 
 
     sendp(p2, iface=inif)
     time.sleep(1)
     assert len(idbclient.get_list_measurements()) == 10
     r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4', None)': [{u'value': 400, u'time': 1524234560}, {u'value': 4, u'time': 1524234570}]})"
+    assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=4')) == [{u'value': 400, u'time': 1524234560}, {u'value': 4, u'time': 1524234570}]
     r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5', None)': [{u'value': 4, u'time': 1524234561}]})"
+    assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=5')) == [{u'value': 4, u'time': 1524234561}]
     r = idbclient.query("select * from \"flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6', None)': [{u'value': 4, u'time': 1524234562}]})"
+    assert list(r.get_points('flow_hop_latency,10.0.0.1:5000->10.0.0.2:5000,proto=17,sw_id=6')) == [{u'value': 4, u'time': 1524234562}]
 
     r = idbclient.query("select * from \"port_tx_utilize,sw_id=4,port_id=3\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=4,port_id=3', None)': [{u'value': 1, u'time': 1524234560}, {u'value': 1000, u'time': 1524234570}]})"
+    assert list(r.get_points('port_tx_utilize,sw_id=4,port_id=3')) == [{u'value': 1, u'time': 1524234560}, {u'value': 1000, u'time': 1524234570}]
     r = idbclient.query("select * from \"port_tx_utilize,sw_id=5,port_id=3\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=5,port_id=3', None)': [{u'value': 1, u'time': 1524234561}]})"
+    assert list(r.get_points('port_tx_utilize,sw_id=5,port_id=3')) == [{u'value': 1, u'time': 1524234561}]
     r = idbclient.query("select * from \"port_tx_utilize,sw_id=6,port_id=3\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'port_tx_utilize,sw_id=6,port_id=3', None)': [{u'value': 1, u'time': 1524234562}]})"
+    assert list(r.get_points('port_tx_utilize,sw_id=6,port_id=3')) == [{u'value': 1, u'time': 1524234562}]
 
     r = idbclient.query("select * from \"queue_occupancy,sw_id=4,queue_id=5\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=4,queue_id=5', None)': [{u'value': 600, u'time': 1524234560}, {u'value': 6, u'time': 1524234570}]})"
+    assert list(r.get_points('queue_occupancy,sw_id=4,queue_id=5')) == [{u'value': 600, u'time': 1524234560}, {u'value': 6, u'time': 1524234570}]
     r = idbclient.query("select * from \"queue_occupancy,sw_id=5,queue_id=5\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=5,queue_id=5', None)': [{u'value': 6, u'time': 1524234561}]})"
+    assert list(r.get_points('queue_occupancy,sw_id=5,queue_id=5')) == [{u'value': 6, u'time': 1524234561}]
     r = idbclient.query("select * from \"queue_occupancy,sw_id=6,queue_id=5\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'queue_occupancy,sw_id=6,queue_id=5', None)': [{u'value': 6, u'time': 1524234562}]})"
+    assert list(r.get_points('queue_occupancy,sw_id=6,queue_id=5')) == [{u'value': 6, u'time': 1524234562}]
 
     r = idbclient.query("select * from \"flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17\"", epoch='ns')
-    assert str(r) == "ResultSet({'(u'flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17', None)': [{u'path': u'6:5:4', u'flow_latency': 408, u'time': 1524138290}, {u'path': u'6:5:4', u'flow_latency': 12, u'time': 1524138300}]})"
+    assert list(r.get_points('flow_stat,10.0.0.1:5000->10.0.0.2:5000,proto=17')) == [{u'path': u'6:5:4', u'flow_latency': 408, u'time': 1524138290}, {u'path': u'6:5:4', u'flow_latency': 12, u'time': 1524138300}]
+
 
 def test_e2e_indb_threshold_v10(setup_veth):
-    cmd = ["python", "InDBClient.py", "-t", "-D", test_db, outif]
+    cmd = [python_ver, "InDBClient.py", "-t", "-D", test_db, outif]
     end_to_end_influxdb_v10(cmd)
 
 def test_e2e_indb_interval_v10(setup_veth):
-    cmd = ["python", "InDBClient.py", "-t", "-e", "INTERVAL", "-D", test_db, outif]
+    cmd = [python_ver, "InDBClient.py", "-t", "-e", "INTERVAL", "-D", test_db, outif]
     end_to_end_influxdb_v10(cmd)
