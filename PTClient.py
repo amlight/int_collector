@@ -1,3 +1,4 @@
+from __future__ import print_function
 import argparse
 from PTCollector import PTCollector
 from prometheus_client import start_http_server
@@ -14,18 +15,18 @@ if __name__ == "__main__":
         help="set to 1 to print event")
     args = parser.parse_args()
 
-    collector = PTCollector(max_int_hop=args.max_int_hop, 
+    collector = PTCollector(max_int_hop=args.max_int_hop,
                             int_dst_port=args.int_port,
                             debug_mode=args.debug_mode)
     for iface in args.ifaces:
         collector.attach_iface(iface)
 
     collector.open_events()
-    
+
     start_http_server(8000)
 
     try:
-        print "eBPF progs Loaded"
+        print("eBPF progs Loaded")
         while 1:
             collector.poll_events()
 
@@ -36,4 +37,3 @@ if __name__ == "__main__":
         collector.detach_all_iface()
         print("Done")
 
-    print "Exit"

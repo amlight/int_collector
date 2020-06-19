@@ -1,5 +1,4 @@
-#!/usr/bin/python
-
+from __future__ import print_function
 from bcc import BPF
 from prometheus_client import Gauge
 import ctypes as ct
@@ -51,14 +50,14 @@ class PTCollector(object):
 
     def attach_iface(self, iface):
         if iface in self.ifaces:
-            print "already attached to ", iface
+            print("already attached to ", iface)
             return
         self.bpf_collector.attach_xdp(iface, self.fn_collector, 0)
         self.ifaces.add(iface)
 
     def detach_iface(self, iface):
         if iface not in self.ifaces:
-            print "no program attached to ", iface
+            print("no program attached to ", iface)
             return
         self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces.remove(iface)
@@ -244,7 +243,7 @@ class PTCollector(object):
 
             # Print event data for debug
             if self.debug_mode==1:
-                print "*" * 20
+                print("*" * 20)
                 for field_name, field_type in event._fields_:
                     field_arr = getattr(event, field_name)
                     if field_name in ["sw_ids","in_port_ids","e_port_ids","hop_latencies",
@@ -254,9 +253,9 @@ class PTCollector(object):
                         s = ""
                         for e in field_arr:
                             s = s+str(e)+", "
-                        print field_name+": ", s
+                        print(field_name+": ", s)
                     else:
-                        print field_name+": ", field_arr
+                        print(field_name+": ", field_arr)
 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
 

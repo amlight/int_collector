@@ -1,5 +1,4 @@
-#!/usr/bin/python
-
+from __future__ import print_function
 import threading
 from bcc import BPF
 from influxdb import InfluxDBClient
@@ -78,14 +77,14 @@ class InDBCollector(object):
 
     def attach_iface(self, iface):
         if iface in self.ifaces:
-            print "already attached to ", iface
+            print("already attached to ", iface)
             return
         self.bpf_collector.attach_xdp(iface, self.fn_collector, 0)
         self.ifaces.add(iface)
 
     def detach_iface(self, iface):
         if iface not in self.ifaces:
-            print "no program attached to ", iface
+            print("no program attached to ", iface)
             return
         self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces.remove(iface)
@@ -165,31 +164,31 @@ class InDBCollector(object):
 
             # Print event data for debug
             if self.debug_mode==1:
-                print "*" * 20
-                print "src_ip", event.src_ip
-                print "dst_ip", event.dst_ip
-                print "src_port", event.src_port
-                print "dst_port", event.dst_port
-                print "ip_proto", event.ip_proto
-                print "num_INT_hop", event.num_INT_hop
-                print "sw_ids", event.sw_ids
-                print "in_port_ids", event.in_port_ids
-                print "e_port_ids", event.e_port_ids
-                print "hop_latencies", event.hop_latencies
-                print "queue_ids", event.queue_ids
-                print "queue_occups", event.queue_occups
-                print "ingr_times", event.ingr_times
-                print "egr_times", event.egr_times
-                print "lv2_in_e_port_ids", event.lv2_in_e_port_ids
-                print "tx_utilizes", event.tx_utilizes
-                print "flow_latency", event.flow_latency
-                print "flow_sink_time", event.flow_sink_time
-                print "is_n_flow", event.is_n_flow
-                print "is_flow", event.is_flow
-                print "is_hop_latency", event.is_hop_latency
-                print "is_queue_occup", event.is_queue_occup
-                # print "is_queue_congest", event.is_queue_congest
-                print "is_tx_utilize", event.is_tx_utilize
+                print("*" * 20)
+                print("src_ip", event.src_ip)
+                print("dst_ip", event.dst_ip)
+                print("src_port", event.src_port)
+                print("dst_port", event.dst_port)
+                print("ip_proto", event.ip_proto)
+                print("num_INT_hop", event.num_INT_hop)
+                print("sw_ids", event.sw_ids)
+                print("in_port_ids", event.in_port_ids)
+                print("e_port_ids", event.e_port_ids)
+                print("hop_latencies", event.hop_latencies)
+                print("queue_ids", event.queue_ids)
+                print("queue_occups", event.queue_occups)
+                print("ingr_times", event.ingr_times)
+                print("egr_times", event.egr_times)
+                print("lv2_in_e_port_ids", event.lv2_in_e_port_ids)
+                print("tx_utilizes", event.tx_utilizes)
+                print("flow_latency", event.flow_latency)
+                print("flow_sink_time", event.flow_sink_time)
+                print("is_n_flow", event.is_n_flow)
+                print("is_flow", event.is_flow)
+                print("is_hop_latency", event.is_hop_latency)
+                print("is_queue_occup", event.is_queue_occup)
+                # print("is_queue_congest", event.is_queue_congest)
+                print("is_tx_utilize", event.is_tx_utilize)
 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
 

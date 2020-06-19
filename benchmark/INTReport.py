@@ -1,4 +1,4 @@
-#!/usr/bin/python
+from __future__ import print_function
 from scapy.all import *
 import time
 import argparse
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                         INTMetadata=[j for j in range(0,6)], \
                         originDSCP=14))
             wrpcap("pcaps/t1_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
-            print "Done: t1_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
+            print("Done: t1_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl))
 
 
 
@@ -167,7 +167,7 @@ if __name__ == "__main__":
                         INTMetadata=[j for j in range(0,n_sw)], \
                         originDSCP=14))
             wrpcap("pcaps/t2_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
-            print "Done: t2_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
+            print("Done: t2_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl))
 
             # all fields
             p=[]
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t2_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl), p)
-            print "Done: t2_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl)
+            print("Done: t2_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl))
 
 
 
@@ -212,7 +212,7 @@ if __name__ == "__main__":
                         INTMetadata=[j for j in range(0,n_sw)], \
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl), p)
-            print "Done: t3_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl)
+            print("Done: t3_{0}sw_{1}fl_swid.pcap".format(n_sw, n_fl))
 
             # sw_id + hop latency
             p=[]
@@ -231,7 +231,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_hoplatency.pcap".format(n_sw, n_fl), p)
-            print "Done: t3_{0}sw_{1}fl_swid_hoplatency.pcap".format(n_sw, n_fl)
+            print("Done: t3_{0}sw_{1}fl_swid_hoplatency.pcap".format(n_sw, n_fl))
 
             # sw_id + txutilize
             p=[]
@@ -250,7 +250,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_txutilize.pcap".format(n_sw, n_fl), p)
-            print "Done: t3_{0}sw_{1}fl_swid_txutilize.pcap".format(n_sw, n_fl)
+            print("Done: t3_{0}sw_{1}fl_swid_txutilize.pcap".format(n_sw, n_fl))
 
             # sw_id + qoccup + qcongest
             p=[]
@@ -269,7 +269,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_swid_qoccup_qcongest.pcap".format(n_sw, n_fl), p)
-            print "Done: t3_{0}sw_{1}fl_swid_qoccup_qcongest.pcap".format(n_sw, n_fl)
+            print("Done: t3_{0}sw_{1}fl_swid_qoccup_qcongest.pcap".format(n_sw, n_fl))
 
             # all fields
             p=[]
@@ -288,7 +288,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t3_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl), p)
-            print "Done: t3_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl)
+            print("Done: t3_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl))
 
 
 
@@ -304,7 +304,7 @@ if __name__ == "__main__":
             # all fields
             p=[]
             for i in range(0, n_fl):
-                print "flow: ", i
+                print("flow: ", i)
                 # 1000000 pps; 1 abnormal packet is 2 events (11+j -> 1000, and 1000 -> 11+j)
                 for l in range(0, TMP/n_event):
                     INTdata = []
@@ -325,7 +325,7 @@ if __name__ == "__main__":
                             INTMetadata= INTdata,
                             originDSCP=14))
             wrpcap("pcaps/t4_{0}sw_{1}fl_{2}event_all.pcap".format(n_sw, n_fl, n_event), p)
-            print "Done: t4_{0}sw_{1}fl_{2}event_all.pcap".format(n_sw, n_fl, n_event)
+            print("Done: t4_{0}sw_{1}fl_{2}event_all.pcap".format(n_sw, n_fl, n_event))
 
 
     # test event_detection
@@ -415,7 +415,7 @@ if __name__ == "__main__":
                         INTMetadata= INTdata,
                         originDSCP=14))
             wrpcap("pcaps/t6_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl), p)
-            print "Done: t6_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl)
+            print("Done: t6_{0}sw_{1}fl_all.pcap".format(n_sw, n_fl))
 
 
     # test event_detection
@@ -446,7 +446,7 @@ if __name__ == "__main__":
 
 
         # wrpcap("pcaps/t7.pcap", p)
-        # print "Done: t7.pcap"
+        # print("Done: t7.pcap")
 
 
     # test v1.0 spec impelementation

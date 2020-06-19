@@ -1,4 +1,5 @@
-#!/usr/bin/python
+from __future__ import print_function
+
 import argparse
 import threading
 import time
@@ -75,7 +76,7 @@ if __name__ == "__main__":
             collector.lock.release()
 
             if args.debug_mode==2:
-                print "Len of events: ", len(data)
+                print("Len of events: ", len(data))
 
             if data:
                 collector.client.write_points(points=data, protocol="line")
@@ -98,7 +99,7 @@ if __name__ == "__main__":
                 if data:
                     collector.client.write_points(points=data, protocol=protocol)
                     if args.debug_mode==2:
-                        print "Periodically push: ", len(data)
+                        print("Periodically push: ", len(data))
 
 
         periodically_push = threading.Thread(target=_periodically_push)
@@ -111,7 +112,7 @@ if __name__ == "__main__":
     # Start polling events
     collector.open_events()
 
-    print "eBPF progs Loaded"
+    print("eBPF progs Loaded")
     sys.stdout.flush()
 
     try:
@@ -129,5 +130,3 @@ if __name__ == "__main__":
 
         collector.detach_all_iface()
         print("Done")
-
-    print "Exit"

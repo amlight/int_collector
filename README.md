@@ -5,7 +5,7 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 # Installation
 ## Collector setup
 
-* Install Ubuntu VM. We only tested INTCollector with Ubuntu 18.04 64 bit with kernel v4.15.
+* Install Ubuntu VM. We only tested INTCollector with Ubuntu 18.04 64 bit with kernel v4.15. Both python2 and python3 should work.
 * Install `bcc` package from https://github.com/iovisor/bcc.
 * Clone this repo
    ``` shell
@@ -13,7 +13,7 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
    ```
 * Install requirements
    ``` shell
-      pip install -r requirements.txt
+      sudo pip3 install -r requirements.txt
    ```
 * [Optional] Enable `JIT` for eBPF, which makes code run faster (recommended):
    ``` shell
@@ -40,8 +40,8 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
   ```
 * Run INTCollector at the network interface that can listen to INT Telemetry reports. If you create `veth` pair above, you can send reports to `veth_0` and listen to reports at `veth_1`:
    ``` shell
-      sudo python PTClient.py veth_1 # For Prometheus
-      sudo python InDBClient.py veth_1 # For InfluxDB
+      sudo python3 PTClient.py veth_1 # For Prometheus
+      sudo python3 InDBClient.py veth_1 # For InfluxDB
    ```
 
 ## Notes
@@ -54,6 +54,6 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 ## Test
 End to end tests for InfluxDB only. InfluxDB needs to run in localhost.
 ``` shell
-   sudo pip install pytest
-   sudo python -m pytest
+   sudo pip3 install pytest
+   sudo python3 -m pytest
 ```
