@@ -9,15 +9,15 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 * Install `bcc` package from https://github.com/iovisor/bcc.
 * Clone this repo
    ``` shell
-      $ git clone https://gitlab.com/tunv_ebpf/BPFCollector.git
+      git clone https://gitlab.com/tunv_ebpf/BPFCollector.git
    ```
 * Install requirements
    ``` shell
-      $ pip install -r requirements.txt
+      pip install -r requirements.txt
    ```
 * [Optional] Enable `JIT` for eBPF, which makes code run faster (recommended):
    ``` shell
-      $ sudo sysctl net/core/bpf_jit_enable=1
+      sudo sysctl net/core/bpf_jit_enable=1
    ```
 
 ## Server setup
@@ -25,23 +25,23 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 * For Prometheus: Install and run Prometheus server from https://prometheus.io . Config the `.yml` file to scrape the INTCollector client. Address should be `localhost` if Prometheus server and INTCollector run on the same machine.
 * For InfluxDB: InfluxDB python client requires InfluxDB sever v1.2.4:
    ``` shell
-      $ wget https://dl.influxdata.com/influxdb/releases/influxdb_1.2.4_amd64.deb
-      $ sudo dpkg -i influxdb_1.2.4_amd64.deb
-      $ sudo systemctl start influxdb
+      wget https://dl.influxdata.com/influxdb/releases/influxdb_1.2.4_amd64.deb
+      sudo dpkg -i influxdb_1.2.4_amd64.deb
+      sudo systemctl start influxdb
    ```
 
 # Usage
 
 * [Optional] create `veth` pair for testing. We can send INT Telemetry reports to one endpoint, and let INTCollector listens to the reports at the other endpoint.
   ``` shell
-    $ sudo ip link add veth_0 type veth peer name veth_1
-    $ sudo ip link set dev veth_0 up
-    $ sudo ip link set dev veth_1 up
+    sudo ip link add veth_0 type veth peer name veth_1
+    sudo ip link set dev veth_0 up
+    sudo ip link set dev veth_1 up
   ```
 * Run INTCollector at the network interface that can listen to INT Telemetry reports. If you create `veth` pair above, you can send reports to `veth_0` and listen to reports at `veth_1`:
    ``` shell
-      $ sudo python PTClient.py veth_1 # For Prometheus
-      $ sudo python InDBClient.py veth_1 # For InfluxDB
+      sudo python PTClient.py veth_1 # For Prometheus
+      sudo python InDBClient.py veth_1 # For InfluxDB
    ```
 
 ## Notes
@@ -54,6 +54,6 @@ Currently, INTCollector supports [Telemetry report v1.0](https://github.com/p4la
 ## Test
 End to end tests for InfluxDB only. InfluxDB needs to run in localhost.
 ``` shell
-    $ sudo pip install pytest
-    $ sudo python -m pytest
+   sudo pip install pytest
+   sudo python -m pytest
 ```
