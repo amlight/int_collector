@@ -244,10 +244,6 @@ struct INT_md_fix_v10_t {
     u16 rsvd2;
 } __attribute__((packed));
 
-struct INT_data_t {
-    u32 data;
-} __attribute__((packed));
-
 struct INT_tail_t {
     u8 nextProto;
     u16 destPort;
@@ -431,8 +427,6 @@ int collector(struct xdp_md *ctx) {
     else if(INT_md_fix->hopMlen == INT_data_len)                                  num_INT_hop = 1;
     else if(0 == INT_data_len)                                                    num_INT_hop = 0;
 
-    struct INT_data_t *INT_data;
-
     struct flow_info_t flow_info = {
         .src_ip = ntohl(in_ip->saddr),
         .dst_ip = ntohl(in_ip->daddr),
@@ -456,42 +450,43 @@ int collector(struct xdp_md *ctx) {
     u8 is_lv2_in_e_port_ids = (INT_ins >> 9) & 0x1;
     u8 is_tx_utilizes 	 = (INT_ins >> 8) & 0x1;
 
+    u32* INT_data;
     u8 _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-        flow_info.sw_ids[i] = ntohl(INT_data->data);
+        flow_info.sw_ids[i] = ntohl(*INT_data);
 
         if (is_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.in_port_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
-            flow_info.e_port_ids[i] = ntohl(INT_data->data) & 0xffff;
+            flow_info.in_port_ids[i] = (ntohl(*INT_data) >> 16) & 0xffff;
+            flow_info.e_port_ids[i] = ntohl(*INT_data) & 0xffff;
         }
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.hop_latencies[i] = ntohl(INT_data->data);
+            flow_info.hop_latencies[i] = ntohl(*INT_data);
             flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.queue_ids[i] = (ntohl(INT_data->data) >> 16) & 0xffff;
-            flow_info.queue_occups[i] = ntohl(INT_data->data) & 0xffff;
+            flow_info.queue_ids[i] = (ntohl(*INT_data) >> 16) & 0xffff;
+            flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffff;
         }
         if (is_ingr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.ingr_times[i] = ntohl(INT_data->data);
+            flow_info.ingr_times[i] = ntohl(*INT_data);
         }
         if (is_egr_times) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.egr_times[i] = ntohl(INT_data->data);
+            flow_info.egr_times[i] = ntohl(*INT_data);
         }
         if (is_lv2_in_e_port_ids) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.lv2_in_e_port_ids[i] = ntohl(INT_data->data);
+            flow_info.lv2_in_e_port_ids[i] = ntohl(*INT_data);
         }
         if (is_tx_utilizes) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-            flow_info.tx_utilizes[i] = ntohl(INT_data->data);
+            flow_info.tx_utilizes[i] = ntohl(*INT_data);
         }
 
         // no need for the final round
