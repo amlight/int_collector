@@ -6,8 +6,8 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 
-
 #define ETHTYPE_IP 0x0800
+#define ETHTYPE_VLAN 33024
 
 // #define IPPROTO_UDP 17
 // #define IPPROTO_TCP 6
@@ -48,6 +48,7 @@
 
 // __packed__ size
 #define ETH_SIZE 14
+#define VLAN_SIZE 2
 #define TCPHDR_SIZE 20
 #define UDPHDR_SIZE 8
 #define INT_SHIM_SIZE 4
@@ -97,7 +98,7 @@
 #define ABS(a, b) ((a>b)? (a-b):(b-a))
 //--------------------------------------------------------------------
 // Protocols
-    struct ports_t {
+struct ports_t {
     u16 source;
     u16 dest;
 } __attribute__((packed));
@@ -106,6 +107,21 @@ struct eth_tp {
     u64 dst:48;
     u64 src:48;
     u16 type;
+} __attribute__((packed));
+
+struct vlan_tp {
+    u16 type;
+#if defined(__BIG_ENDIAN_BITFIELD)
+    u16 pri:3,
+        cfi:1,
+        vid:12;
+#elif defined(__LITTLE_ENDIAN_BITFIELD)
+    u16 vid:12,
+        cfi:1,
+        pri:3;
+#else
+#error  "Please fix <asm/byteorder.h>"
+#endif
 } __attribute__((packed));
 
 struct telemetry_report_t {
@@ -365,30 +381,32 @@ int collector(struct xdp_md *ctx) {
 
     struct eth_tp *eth;
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
-
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
         return XDP_PASS;
+
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
-
     if (unlikely(ip->protocol != IPPROTO_UDP))
         return XDP_PASS;
+
     struct udphdr *udp;
     CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
-
     if (unlikely(ntohs(udp->dest) != INT_DST_PORT))
         return XDP_PASS;
+
     // struct telemetry_report_t *tm_rp;
     struct telemetry_report_v10_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
-
     /*
-        Parse Inner: Ether->IP->UDP/TCP->INT.
+        Parse Inner: Ether->[Vlan]->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
+
+    struct vlan_tp *vlan;
+    CURSOR_ADVANCE(vlan, cursor, sizeof(*vlan), data_end);
 
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
@@ -465,7 +483,7 @@ int collector(struct xdp_md *ctx) {
         if (is_hop_latencies) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             flow_info.hop_latencies[i] = ntohl(*INT_data);
-            flow_info.flow_latency += flow_info.hop_latencies[i];
+            // flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         if (is_queue_occups) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -488,6 +506,10 @@ int collector(struct xdp_md *ctx) {
             CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
             flow_info.tx_utilizes[i] = ntohl(*INT_data);
         }
+
+        /* NoviFlow doesn't support hop_latency. Let's calculate it from timestamps */
+        flow_info.hop_latencies[i] = flow_info.egr_times[i] - flow_info.ingr_times[i];
+        flow_info.flow_latency += flow_info.hop_latencies[i];
 
         // no need for the final round
         if (i < MAX_INT_HOP - 1) {

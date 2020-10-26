@@ -39,8 +39,9 @@ cdef struct Event:
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=54321, int_time=False,
-                    host="localhost", database="INTdatabase",event_mode="THRESHOLD"):
+    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=5900, int_time=False,
+                 host="localhost", database="INTdatabase",event_mode="THRESHOLD"):
+
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = _MAX_INT_HOP
@@ -73,7 +74,6 @@ class InDBCollector(object):
         self.client = InfluxDBClient(host=host, database=database)
 
         self.debug_mode = debug_mode
-
 
     def attach_iface(self, iface):
         if iface in self.ifaces:
@@ -126,7 +126,7 @@ class InDBCollector(object):
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_hop_latency >> i) & 0x01):
+                    if (event.is_hop_latency >> i) & 0x01:
                         event_data.append(u"flow_hop_latency\\,%s:%d->%s:%d\\,proto\\=%d\\,sw_id\\=%d value=%d%s" % (
                                     self.int_2_ip4_str(event.src_ip),
                                     event.src_port,
@@ -139,14 +139,14 @@ class InDBCollector(object):
 
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_tx_utilize >> i) & 0x01):
+                    if (event.is_tx_utilize >> i) & 0x01:
                         event_data.append("port_tx_utilize\\,sw_id\\=%d\\,port_id\\=%d value=%d%s" % (
                                         event.sw_ids[i], event.e_port_ids[i], event.tx_utilizes[i],
                                         ' %d' % event.egr_times[i] if self.int_time else ''))
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
-                    if ((event.is_queue_occup >> i) & 0x01):
+                    if (event.is_queue_occup >> i) & 0x01:
                         event_data.append("queue_occupancy\\,sw_id\\=%d\\,queue_id\\=%d value=%d%s" % (
                                         event.sw_ids[i], event.queue_ids[i], event.queue_occups[i],
                                         ' %d' % event.egr_times[i] if self.int_time else ''))
@@ -192,7 +192,6 @@ class InDBCollector(object):
 
         self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
 
-
     def collect_data(self):
 
         data = []
@@ -200,15 +199,15 @@ class InDBCollector(object):
         for (flow_id, flow_info) in self.tb_flow.iteritems():
             path_str = ":".join(str(flow_info.sw_ids[i]) for i in reversed(range(0, flow_info.num_INT_hop)))
 
-            flow_id_str = "%s:%d->%s:%d\\,proto\\=%d" % (self.int_2_ip4_str(flow_id.src_ip), \
-                                                    flow_id.src_port, \
-                                                    self.int_2_ip4_str(flow_id.dst_ip), \
-                                                    flow_id.dst_port, \
-                                                    flow_id.ip_proto)
+            flow_id_str = ("%s:%d->%s:%d\\,proto\\=%d" % (self.int_2_ip4_str(flow_id.src_ip),
+                                                          flow_id.src_port,
+                                                          self.int_2_ip4_str(flow_id.dst_ip),
+                                                          flow_id.dst_port,
+                                                          flow_id.ip_proto))
 
-            data.append("flow_stat\\,%s flow_latency=%d,path=\"%s\"%s" % (
-                    flow_id_str, flow_info.flow_latency, path_str,
-                    ' %d' % flow_info.flow_sink_time if self.int_time else ''))
+            data.append("flow_stat\\,%s flow_latency=%d,path=\"%s\"%s" %
+                        (flow_id_str, flow_info.flow_latency, path_str,
+                         ' %d' % flow_info.flow_sink_time if self.int_time else ''))
 
             if flow_info.is_hop_latency:
                 for i in range(0, flow_info.num_INT_hop):
