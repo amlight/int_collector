@@ -59,6 +59,7 @@ if __name__ == "__main__":
 
     # clear all old dbs. For easy testing
     # TODO: remove once it is ready
+    # Test if database is not found,create one
     for db in collector.client.get_list_database():
         collector.client.drop_database(db["name"])
     collector.client.create_database(args.database)
@@ -83,28 +84,6 @@ if __name__ == "__main__":
             if data:
                 collector.client.write_points(points=data, protocol="line")
 
-    # A separated thread to push data
-    if args.event_mode == "INTERVAL":
-        def _periodically_push():
-            cnt = 0
-            while not push_stop_flag.is_set():
-                # use cnt to partition sleep time,
-                # so Ctrl-C could terminate the program earlier
-                time.sleep(1)
-                cnt += 1
-                if cnt < args.period:
-                    continue
-                cnt = 0
-
-                data = collector.collect_data()
-                if data:
-                    collector.client.write_points(points=data, protocol=protocol)
-                    if args.debug_mode == 2:
-                        print("Periodically push: ", len(data))
-
-        periodically_push = threading.Thread(target=_periodically_push)
-        periodically_push.start()
-
     event_push = threading.Thread(target=_event_push)
     event_push.start()
 
@@ -123,8 +102,8 @@ if __name__ == "__main__":
 
     finally:
         push_stop_flag.set()
-        if args.event_mode == "INTERVAL":
-            periodically_push.join()
+        # if args.event_mode == "INTERVAL":
+        #     periodically_push.join()
         event_push.join()
 
         collector.detach_all_iface()
