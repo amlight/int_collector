@@ -128,7 +128,7 @@ struct INT_md_fix_v10_t {
 #else
 #error  "Please fix <asm/byteorder.h>"
 #endif
-    u8  remainHopCnt:8;
+    u8  remainHopCnt;
     u16 ins;
     u16 rsvd2;
 } __attribute__((packed));
@@ -170,12 +170,12 @@ struct egr_tx_info_t {
 struct flow_info_t {
     u16 vlan_id;
     u8 num_INT_hop;
+    u8 hop_negative; // In case there is an error
 
     u32 sw_ids[MAX_INT_HOP];
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
     u32 hop_latencies[MAX_INT_HOP];
-    u16 hop_negative[MAX_INT_HOP]; // In case there is an error
     u16 queue_ids[MAX_INT_HOP];
     u16 queue_occups[MAX_INT_HOP];
     u32 ingr_times[MAX_INT_HOP];
@@ -190,7 +190,6 @@ struct flow_info_t {
 
     u8 is_hop_latency;
     u8 is_queue_occup;
-  //  u8 is_tx_utilize;
 };
 
 BPF_PERF_OUTPUT(events);
@@ -245,13 +244,15 @@ int collector(struct xdp_md *ctx) {
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
 
-    struct ports_t *in_ports;
-    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);
+//    struct ports_t *in_ports;
+//    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);
 
     // NoviFlow adds INT between TCP and TCP Options
+//    u8 remain_size = (in_ip->protocol == IPPROTO_UDP)?
+//                      (UDPHDR_SIZE - sizeof(*in_ports)) :
+//                      (TCPHDR_SIZE - sizeof(*in_ports));
     u8 remain_size = (in_ip->protocol == IPPROTO_UDP)?
-                      (UDPHDR_SIZE - sizeof(*in_ports)) :
-                      (TCPHDR_SIZE - sizeof(*in_ports));
+                      (UDPHDR_SIZE):(TCPHDR_SIZE);
     CURSOR_ADVANCE_NO_PARSE(cursor, remain_size, data_end);
 
     struct INT_shim_v10_t *INT_shim;
@@ -264,13 +265,17 @@ int collector(struct xdp_md *ctx) {
         Parse INT data
     */
 
-    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
+//    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
+    u8 num_INT_hop = 10 - 4;
+
 
     struct flow_info_t flow_info = {
         .vlan_id = ntohs(vlan->vid),
-        .num_INT_hop = num_INT_hop,
+        .num_INT_hop = INT_md_fix->remainHopCnt,
         .flow_sink_time = current_time_ns
     };
+
+//    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - flow_info.num_INT_hop;
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
     // Assume that sw_id is always presented.
@@ -284,10 +289,10 @@ int collector(struct xdp_md *ctx) {
     /* NoviFlow doesn't support other instructions */
 
     u32* INT_data;
-    u8 _num_INT_hop = num_INT_hop;
+ //   u8 _num_INT_hop = num_INT_hop;
 
     #pragma unroll
-    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+    for (u8 i = 0; i < num_INT_hop; i++) {
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.sw_ids[i] = ntohl(*INT_data);
 
@@ -311,19 +316,19 @@ int collector(struct xdp_md *ctx) {
         /* NoviFlow doesn't support hop_latency. Let's calculate it from timestamps */
         if (flow_info.egr_times[i] > flow_info.ingr_times[i]){
             flow_info.hop_latencies[i] = flow_info.egr_times[i] - flow_info.ingr_times[i];
+            flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         else{
-            flow_info.hop_negative[i] = 1;
+            flow_info.hop_negative = 1;
+            flow_info.hop_latencies[i] = 400;
         }
-
-        flow_info.flow_latency += flow_info.hop_latencies[i];
 
         // no need for the final round
-        if (i < MAX_INT_HOP - 1) {
-            _num_INT_hop--;
-            if (_num_INT_hop <= 0)
-                break;
-        }
+//        if (i < MAX_INT_HOP - 1) {
+//            _num_INT_hop--;
+//            if (_num_INT_hop <= 0)
+//                break;
+//        }
     }
 
     /*
@@ -340,12 +345,12 @@ int collector(struct xdp_md *ctx) {
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
 
-    // Debug: Send all flows
-    // flow_info.is_flow = 1;
+    // Debug: Send all flows. Use with caution!
+    //flow_info.is_flow = 1;
 
     if (unlikely(!flow_info_p)) {
 
-        flow_info.is_n_flow = 1;  // TODO: does flow_info have is_n_flow?
+        flow_info.is_n_flow = 1;
         is_update = 1;
 
         if (is_hop_latencies) {
@@ -382,9 +387,9 @@ int collector(struct xdp_md *ctx) {
             is_update = 1;
         }
 
-        _num_INT_hop = num_INT_hop;
+//        _num_INT_hop = num_INT_hop;
         #pragma unroll
-        for (u8 i = 0; i < MAX_INT_HOP; i++) {
+        for (u8 i = 0; i < num_INT_hop; i++) {
 
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
@@ -404,11 +409,11 @@ int collector(struct xdp_md *ctx) {
             }
 
             // no need for the final round
-            if (i < MAX_INT_HOP - 1) {
-                _num_INT_hop--;
-                if (_num_INT_hop <= 0)
-                    break;
-            }
+//            if (i < MAX_INT_HOP - 1) {
+//                _num_INT_hop--;
+//                if (_num_INT_hop <= 0)
+//                    break;
+//            }
         }
     }
 
@@ -469,12 +474,12 @@ int collector(struct xdp_md *ctx) {
     struct queue_id_t queue_id = {};
     struct queue_info_t queue_info = {};
 
-    _num_INT_hop = num_INT_hop;
+//    _num_INT_hop = num_INT_hop;
     #pragma unroll
-    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+    for (u8 i = 0; i < num_INT_hop; i++) {
         if (is_queue_occups) {
-            if (_num_INT_hop <= 0)
-                break;
+//            if (_num_INT_hop <= 0)
+//                break;
 
             queue_id.sw_id = flow_info.sw_ids[i];
             queue_id.p_id = flow_info.e_port_ids[i];
@@ -502,7 +507,7 @@ int collector(struct xdp_md *ctx) {
             if (is_update)
                 tb_queue.update(&queue_id, &queue_info);
 
-            _num_INT_hop--;
+//            _num_INT_hop--;
         }
     }
 
@@ -515,5 +520,5 @@ int collector(struct xdp_md *ctx) {
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
 
 DROP:
-    return XDP_PASS;
+    return XDP_DROP;
 }

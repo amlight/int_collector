@@ -11,12 +11,12 @@ _MAX_INT_HOP = __MAX_INT_HOP
 cdef struct Event:
     unsigned short vlan_id
     unsigned char  num_INT_hop
+    unsigned char  hop_negative
 
     unsigned int   sw_ids[__MAX_INT_HOP]
     unsigned short in_port_ids[__MAX_INT_HOP]
     unsigned short e_port_ids[__MAX_INT_HOP]
     unsigned int   hop_latencies[__MAX_INT_HOP]
-    unsigned short hop_negative[__MAX_INT_HOP]
     unsigned short queue_ids[__MAX_INT_HOP]
     unsigned short queue_occups[__MAX_INT_HOP]
     unsigned int   ingr_times[__MAX_INT_HOP]
@@ -38,27 +38,31 @@ cdef struct Event:
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=5900, int_time=False,
-                 host="localhost", database="INTdatabase", event_mode="THRESHOLD"):
+    # def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=5900, int_time=False,
+    #              host="localhost", database="INTdatabase", event_mode="THRESHOLD"):
+    def __init__(self, int_dst_port=5900, debug_mode=0, host="localhost", database="INTdatabase"):
 
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = _MAX_INT_HOP
         self.SERVER_MODE = "INFLUXDB"
         self.INT_DST_PORT = int_dst_port
-        self.EVENT_MODE = event_mode
-        self.int_time = int_time
+        # self.EVENT_MODE = event_mode
+        self.int_time = False
         self.pkt_counter = 0
 
         self.ifaces = set()
 
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
+            # cflags=["-w",
+            #         "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
+            #         "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
+            #         "-D_EVENT_MODE=%s" % self.EVENT_MODE,
+            #         "-D_SERVER_MODE=%s" % self.SERVER_MODE])
             cflags=["-w",
                     "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
-                    "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
-                    "-D_EVENT_MODE=%s" % self.EVENT_MODE,
-                    "-D_SERVER_MODE=%s" % self.SERVER_MODE])
+                    "-D_INT_DST_PORT=%s" % self.INT_DST_PORT])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
         # get all the info table
@@ -94,9 +98,9 @@ class InDBCollector(object):
             self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces = set()
 
-    def int_2_ip4_str(self, ipint):
-        cdef unsigned char i
-        return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
+    # def int_2_ip4_str(self, ipint):
+    #     cdef unsigned char i
+    #     return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
 
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
@@ -116,25 +120,24 @@ class InDBCollector(object):
             if self.debug_mode==1:
                 # pass
                 print("*********")
-                print("hop_negative", event.hop_negative)
-                # print("pkt_counter", self.add_pkt_counter())
-                # print("vlan", event.vlan_id)
-                # print("num_INT_hop", event.num_INT_hop)
-                # print("sw_ids", event.sw_ids)
+                # print("hop_negative", event.hop_negative)
+                print("pkt_counter", self.add_pkt_counter())
+                print("vlan", event.vlan_id)
+                print("num_INT_hop", event.num_INT_hop)
+                print("sw_ids", event.sw_ids)
                 # print("in_port_ids", event.in_port_ids)
                 # print("e_port_ids", event.e_port_ids)
-                print("hop_latencies", event.hop_latencies)
-                # print("queue_ids", event.queue_ids)
-                # print("queue_occups", event.queue_occups)
-                print("ingr_times", event.ingr_times)
-                print("egr_times", event.egr_times)
-                print("flow_latency", event.flow_latency)
+                # print("hop_latencies", event.hop_latencies)
+                print("queue_ids", event.queue_ids)
+                print("queue_occups", event.queue_occups)
+                # print("ingr_times", event.ingr_times)
+                # print("egr_times", event.egr_times)
+                # print("flow_latency", event.flow_latency)
                 # print("flow_sink_time", event.flow_sink_time)
                 # print("is_n_flow", event.is_n_flow)
                 # print("is_flow", event.is_flow)
                 # print("is_hop_latency", event.is_hop_latency)
                 # print("is_queue_occup", event.is_queue_occup)
-                # print("is_tx_utilize", event.is_tx_utilize)
 
             event_data = []
 
@@ -168,8 +171,8 @@ class InDBCollector(object):
             #     for i in range(0, event.num_INT_hop):
             #         if (event.is_tx_utilize >> i) & 0x01:
             #             event_data.append("port_tx_utilize\\,sw_id\\=%d\\,port_id\\=%d value=%d%s" % (
-            #                             event.sw_ids[i], event.e_port_ids[i], event.tx_utilizes[i],
-            #                             ' %d' % event.egr_times[i] if self.int_time else ''))
+            #                                event.sw_ids[i], event.e_port_ids[i], event.tx_utilizes[i],
+            #                                ' %d' % event.egr_times[i] if self.int_time else ''))
 
             # This is ready:
             if event.is_queue_occup:
@@ -191,4 +194,4 @@ class InDBCollector(object):
             self.event_data.extend(event_data)
             self.lock.release()
 
-        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
+        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=1024)

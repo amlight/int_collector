@@ -24,18 +24,18 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    parser.add_argument("-p", "--period", default=10, type=int,
-                        help="Time period to push data in normal condition")
-
+    # parser.add_argument("-p", "--period", default=10, type=int,
+    #                     help="Time period to push data in normal condition")
+    #
     parser.add_argument("-P", "--event_period", default=1, type=float,
                         help="Time period to push event data")
-
-    parser.add_argument("-t", "--int_time", action='store_true',
-                        help="Use INT timestamp instead of local time")
-
-    parser.add_argument("-e", "--event_mode", default="THRESHOLD",
-                        help="Event detection mode: INTERVAL or THRESHOLD. \
-                         Option -p is disabled for THRESHOLD and is hard-coded instead")
+    #
+    # parser.add_argument("-t", "--int_time", action='store_true',
+    #                     help="Use INT timestamp instead of local time")
+    #
+    # parser.add_argument("-e", "--event_mode", default="THRESHOLD",
+    #                     help="Event detection mode: INTERVAL or THRESHOLD. \
+    #                      Option -p is disabled for THRESHOLD and is hard-coded instead")
 
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
                         help="Set to 1 to print event")
@@ -47,12 +47,16 @@ if __name__ == "__main__":
 
     args = parse_params()
 
+    # collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
+    #                                         debug_mode=args.debug_mode,
+    #                                         host=args.host,
+    #                                         database=args.database,
+    #                                         int_time=args.int_time,
+    #                                         event_mode=args.event_mode)
     collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
                                             debug_mode=args.debug_mode,
                                             host=args.host,
-                                            database=args.database,
-                                            int_time=args.int_time,
-                                            event_mode=args.event_mode)
+                                            database=args.database)
 
     for iface in args.ifaces:
         collector.attach_iface(iface)
@@ -78,7 +82,7 @@ if __name__ == "__main__":
             collector.event_data = []
             collector.lock.release()
 
-            if args.debug_mode == 2:
+            if args.debug_mode == 1:
                 print("Len of events: ", len(data))
 
             if data:
