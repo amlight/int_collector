@@ -24,21 +24,17 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    # parser.add_argument("-p", "--period", default=10, type=int,
-    #                     help="Time period to push data in normal condition")
-    #
     parser.add_argument("-P", "--event_period", default=1, type=float,
                         help="Time period to push event data")
-    #
-    # parser.add_argument("-t", "--int_time", action='store_true',
-    #                     help="Use INT timestamp instead of local time")
-    #
-    # parser.add_argument("-e", "--event_mode", default="THRESHOLD",
-    #                     help="Event detection mode: INTERVAL or THRESHOLD. \
-    #                      Option -p is disabled for THRESHOLD and is hard-coded instead")
 
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
                         help="Set to 1 to print event")
+
+    parser.add_argument("-n", "--new-measurements", default=0, type=int,
+                        help="Set to 1 to delete influxdb measurements")
+
+    parser.add_argument("-m", "--xdp-mode", default=0, type=int,
+                        help="Set to 1 to hardware off. Default is Native mode")
 
     return parser.parse_args()
 
@@ -47,26 +43,23 @@ if __name__ == "__main__":
 
     args = parse_params()
 
-    # collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
-    #                                         debug_mode=args.debug_mode,
-    #                                         host=args.host,
-    #                                         database=args.database,
-    #                                         int_time=args.int_time,
-    #                                         event_mode=args.event_mode)
     collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
                                             debug_mode=args.debug_mode,
                                             host=args.host,
-                                            database=args.database)
+                                            database=args.database,
+                                            flags=args.xdp_mode)
 
     for iface in args.ifaces:
         collector.attach_iface(iface)
 
-    # clear all old dbs. For easy testing
-    # TODO: remove once it is ready
     # Test if database is not found,create one
-    # for db in collector.client.get_list_database():
-    #     collector.client.drop_database(db["name"])
-    # collector.client.create_database(args.database)
+    if not len(collector.client.get_list_database()):
+        collector.client.create_database(args.database)
+
+    if args.new_measurements:
+        for db in collector.client.get_list_database():
+            collector.client.drop_database(db["name"])
+        collector.client.create_database(args.database)
 
     push_stop_flag = threading.Event()
 
@@ -106,8 +99,6 @@ if __name__ == "__main__":
 
     finally:
         push_stop_flag.set()
-        # if args.event_mode == "INTERVAL":
-        #     periodically_push.join()
         event_push.join()
 
         collector.detach_all_iface()
