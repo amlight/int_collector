@@ -4,8 +4,7 @@ from bcc import BPF
 from influxdb import InfluxDBClient
 from libc.stdint cimport uintptr_t
 
-
-# change array len of sw_ids.. to .. tx_utilizes to match with max_int_hop in the collector
+# TODO: FIX01
 cdef enum: __MAX_INT_HOP = 6
 _MAX_INT_HOP = __MAX_INT_HOP
 cdef struct Event:
@@ -40,39 +39,34 @@ cdef struct Event:
 class InDBCollector(object):
     """docstring for InDBCollector"""
 
-    # def __init__(self, max_int_hop=6, debug_mode=0, int_dst_port=5900, int_time=False,
-    #              host="localhost", database="INTdatabase", event_mode="THRESHOLD"):
-    def __init__(self, int_dst_port=5900, debug_mode=0, host="localhost", database="INTdatabase"):
+    def __init__(self,
+                 int_dst_port=5900,
+                 debug_mode=0,
+                 host="localhost",
+                 database="INTdatabase",
+                 flags=0):
 
         super(InDBCollector, self).__init__()
 
         self.MAX_INT_HOP = _MAX_INT_HOP
-        self.SERVER_MODE = "INFLUXDB"
+        # self.SERVER_MODE = "INFLUXDB"
         self.INT_DST_PORT = int_dst_port
-        # self.EVENT_MODE = event_mode
         self.int_time = False
-        self.pkt_counter = 0
+        # self.pkt_counter = 0
 
         self.ifaces = set()
 
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
-            # cflags=["-w",
-            #         "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
-            #         "-D_INT_DST_PORT=%s" % self.INT_DST_PORT,
-            #         "-D_EVENT_MODE=%s" % self.EVENT_MODE,
-            #         "-D_SERVER_MODE=%s" % self.SERVER_MODE])
-            cflags=["-w",
-                    "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
-                    "-D_INT_DST_PORT=%s" % self.INT_DST_PORT])
+                                 cflags=["-w",
+                                         "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
+                                         "-D_INT_DST_PORT=%s" % self.INT_DST_PORT])
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
-        # get all the info table
+        # get all the info table for the future.
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
         self.tb_egr   = self.bpf_collector .get_table("tb_egr_util")
-
-        self.flow_paths = {}
 
         self.lock = threading.Lock()
         self.event_data = []
@@ -80,13 +74,15 @@ class InDBCollector(object):
         self.client = InfluxDBClient(host=host, database=database)
 
         self.debug_mode = debug_mode
-        self.flags = 0
+
+        self.flags = 0 | (1 << 3) if flags else 0
+
 
     def attach_iface(self, iface):
         if iface in self.ifaces:
             print("already attached to ", iface)
             return
-        self.flags |= (1 << 3)
+
         self.bpf_collector.attach_xdp(iface, self.fn_collector, self.flags)
         self.ifaces.add(iface)
 
@@ -102,16 +98,8 @@ class InDBCollector(object):
             self.bpf_collector.remove_xdp(iface, 0)
         self.ifaces = set()
 
-    # def int_2_ip4_str(self, ipint):
-    #     cdef unsigned char i
-    #     return '.'.join([str(ipint >> (i << 3) & 0xFF) for i in [3, 2, 1, 0]])
-
     def poll_events(self):
         self.bpf_collector.kprobe_poll()
-
-    def add_pkt_counter(self):
-        self.pkt_counter = self.pkt_counter + 1
-        return self.pkt_counter
 
     def open_events(self):
 
@@ -122,70 +110,71 @@ class InDBCollector(object):
 
             # Print event data for debug
             if self.debug_mode==1:
-                # print("*********")
-                # print("hop_negative", event.hop_negative)
-                # print("seqNumber", event.seqNumber)
-                # print("vlan", event.vlan_id)
-                # print("num_INT_hop", event.num_INT_hop)
-                # print("sw_ids", event.sw_ids)
-                # # print("in_port_ids", event.in_port_ids)
-                # # print("e_port_ids", event.e_port_ids)
-                # # print("hop_latencies", event.hop_latencies)
-                # print("queue_ids", event.queue_ids)
-                # print("queue_occups", event.queue_occups)
-                # print("ingr_times", event.ingr_times)
-                # print("egr_times", event.egr_times)
+                print("*********")
+                print("hop_negative", event.hop_negative)
+                print("seqNumber", event.seqNumber)
+                print("vlan", event.vlan_id)
+                print("num_INT_hop", event.num_INT_hop)
+                print("sw_ids", event.sw_ids)
+                print("in_port_ids", event.in_port_ids)
+                print("e_port_ids", event.e_port_ids)
+                print("hop_latencies", event.hop_latencies)
+                print("queue_ids", event.queue_ids)
+                print("queue_occups", event.queue_occups)
+                print("ingr_times", event.ingr_times)
+                print("egr_times", event.egr_times)
                 print("tx_utilize", event.tx_utilize)
                 print("tx_utilize_delta", event.tx_utilize_delta)
-                # print("flow_latency", event.flow_latency)
-                # print("flow_sink_time", event.flow_sink_time)
-                # print("is_n_flow", event.is_n_flow)
-                # print("is_flow", event.is_flow)
-                # print("is_hop_latency", event.is_hop_latency)
-                # print("is_queue_occup", event.is_queue_occup)
+                print("flow_latency", event.flow_latency)
+                print("flow_sink_time", event.flow_sink_time)
+                print("is_n_flow", event.is_n_flow)
+                print("is_flow", event.is_flow)
+                print("is_hop_latency", event.is_hop_latency)
+                print("is_queue_occup", event.is_queue_occup)
 
             event_data = []
 
-            # if event.is_n_flow or event.is_flow:
-            #     path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
-            #
-            #     event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
-            #                         event.vlan_id,
-            #                         event.sw_ids[0],
-            #                         event.e_port_ids[0],
-            #                         event.flow_latency,
-            #                         path_str,
-            #                         ' %d' % event.flow_sink_time if self.int_time else ''))
-            #
-            # if event.is_hop_latency:
-            #     for i in range(0, event.num_INT_hop):
-            #         if (event.is_hop_latency >> i) & 0x01:
-            #             event_data.append(u"flow_hop_latency\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d\\,sw_hop=%i value=%d%s" % (
-            #                         event.vlan_id,
-            #                         event.sw_ids[0],
-            #                         event.e_port_ids[0],
-            #                         event.sw_ids[i],
-            #                         event.hop_latencies[i],
-            #                         ' %d' % event.egr_times[i] if self.int_time else ''))
-            #
-            # if event.is_tx_utilize:
-            #     for i in range(0, event.num_INT_hop):
-            #         if (event.is_tx_utilize >> i) & 0x01:
-            #             bw = (int(event.tx_utilize[i]))/(int(event.tx_utilize_delta[i]))
-            #             event_data.append(u"port_tx_utilize\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" % (
-            #                                event.sw_ids[i], event.e_port_ids[i], event.queue_ids[i], bw,
-            #                                ' %d' % event.egr_times[i] if self.int_time else ''))
-            #
-            # # This is ready:
-            # if event.is_queue_occup:
-            #     for i in range(0, event.num_INT_hop):
-            #         if (event.is_queue_occup >> i) & 0x01:
-            #             event_data.append("queue_occupancy\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" %
-            #                               (event.sw_ids[i],
-            #                                event.e_port_ids[i],
-            #                                event.queue_ids[i],
-            #                                event.queue_occups[i],
-            #                                ' %d' % event.egr_times[i] if self.int_time else ''))
+            # TODO: FIX02: Review these inputs
+            if event.is_n_flow or event.is_flow:
+                path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
+
+                event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
+                                    event.vlan_id,
+                                    event.sw_ids[0],
+                                    event.e_port_ids[0],
+                                    event.flow_latency,
+                                    path_str,
+                                    ' %d' % event.flow_sink_time if self.int_time else ''))
+
+            if event.is_hop_latency:
+                for i in range(0, event.num_INT_hop):
+                    if (event.is_hop_latency >> i) & 0x01:
+                        event_data.append(u"flow_hop_latency\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d\\,sw_hop=%i value=%d%s" % (
+                                    event.vlan_id,
+                                    event.sw_ids[0],
+                                    event.e_port_ids[0],
+                                    event.sw_ids[i],
+                                    event.hop_latencies[i],
+                                    ' %d' % event.egr_times[i] if self.int_time else ''))
+
+            if event.is_tx_utilize:
+                for i in range(0, event.num_INT_hop):
+                    if (event.is_tx_utilize >> i) & 0x01:
+                        bw = (int(event.tx_utilize[i]))/(int(event.tx_utilize_delta[i]))
+                        event_data.append(u"port_tx_utilize\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" % (
+                                           event.sw_ids[i], event.e_port_ids[i], event.queue_ids[i], bw,
+                                           ' %d' % event.egr_times[i] if self.int_time else ''))
+
+            # This is ready:
+            if event.is_queue_occup:
+                for i in range(0, event.num_INT_hop):
+                    if (event.is_queue_occup >> i) & 0x01:
+                        event_data.append("queue_occupancy\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" %
+                                          (event.sw_ids[i],
+                                           event.e_port_ids[i],
+                                           event.queue_ids[i],
+                                           event.queue_occups[i],
+                                           ' %d' % event.egr_times[i] if self.int_time else ''))
 
             self.lock.acquire()
             self.event_data.extend(event_data)
