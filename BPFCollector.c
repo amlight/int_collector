@@ -21,12 +21,12 @@
 #define UDPHDR_SIZE 8
 #define INT_SHIM_SIZE 4
 
-// TODO: set these values from use space
+// TODO: FIX03 set these values from use space
 #define HOP_LATENCY 2000
 #define FLOW_LATENCY 50000
 #define QUEUE_OCCUP 135 // 135 * 80 bytes = 10KB
-#define TX_UTILIZE 210000000  // 20Gbps
-#define BW_INTERVAL 100000000  // 10ms
+//#define TX_UTILIZE 210000000  // 20Gbps
+//#define BW_INTERVAL 100000000  // 10ms
 #define TIME_GAP_W 1000000000 //ns 1s  1 000 000 000
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
@@ -51,15 +51,9 @@ struct eth_tp {
 
 /* VLAN Ethertype */
 struct vlan_tp {
-    u16 vid; // TODO: change to u16 vid:12
+    u16 vid; // TODO: FIX04 change to u16 vid:12
     u16 type;
 } __attribute__((packed));
-
-/* Both TCP and UDP headers start with this struct */
-//struct ports_t {
-//    u16 source;
-//    u16 dest;
-//} __attribute__((packed));
 
 /* INT Telemetry report */
 struct telemetry_report_v10_t {
@@ -247,6 +241,7 @@ int collector(struct xdp_md *ctx) {
     /*
         Parse Inner: Ether->Vlan->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
+        TODO: Consider an extra VLAN (QinQ)
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
@@ -341,10 +336,6 @@ int collector(struct xdp_md *ctx) {
     flow_id.last_egr_id = flow_info.e_port_ids[0];
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
-
-    // Debug: Send all flows. Use with caution!
-//    flow_info.is_flow = 1;
-
     if (unlikely(!flow_info_p)) {
 
         flow_info.is_n_flow = 1;
@@ -358,8 +349,7 @@ int collector(struct xdp_md *ctx) {
                 case 4: flow_info.is_hop_latency = 0x0f; break;
                 case 5: flow_info.is_hop_latency = 0x1f; break;
                 case 6: flow_info.is_hop_latency = 0x3f; break;
-                // MAX 6 for now
-                /* TODO: Fix this */
+                // FIX01: MAX 6 for now
                 // case 7: flow_info.is_hop_latency = 0x7f; break;
                 // case 8: flow_info.is_hop_latency = 0xff; break;
                 // case 9: flow_info.is_hop_latency = 0x1ff; break;
@@ -379,7 +369,6 @@ int collector(struct xdp_md *ctx) {
             | (is_hop_latencies & (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY))
             ) {
 
-//        if (is_hop_latencies & (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY)){
             flow_info.is_flow = 1;
             is_update = 1;
         }
@@ -429,7 +418,6 @@ int collector(struct xdp_md *ctx) {
         if(unlikely(!egr_info_p)) {
             egr_info.octets = 0;
             egr_info.time_ns = current_time_ns;
-            tb_egr_util.update(&egr_id, &egr_info);
         }
         else {
             delta_time = current_time_ns - egr_info_p->time_ns;
@@ -437,7 +425,6 @@ int collector(struct xdp_md *ctx) {
 
             if (delta_time < 100000000){
                 egr_info.time_ns = egr_info_p->time_ns;
-                tb_egr_util.update(&egr_id, &egr_info);
             }
             else {
 
@@ -449,9 +436,9 @@ int collector(struct xdp_md *ctx) {
 
                 egr_info.octets = 0;
                 egr_info.time_ns = current_time_ns;
-                tb_egr_util.update(&egr_id, &egr_info);
             }
         }
+        tb_egr_util.update(&egr_id, &egr_info);
     }
 
 
