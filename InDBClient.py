@@ -64,9 +64,9 @@ if __name__ == "__main__":
     # clear all old dbs. For easy testing
     # TODO: remove once it is ready
     # Test if database is not found,create one
-    for db in collector.client.get_list_database():
-        collector.client.drop_database(db["name"])
-    collector.client.create_database(args.database)
+    # for db in collector.client.get_list_database():
+    #     collector.client.drop_database(db["name"])
+    # collector.client.create_database(args.database)
 
     push_stop_flag = threading.Event()
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
             collector.event_data = []
             collector.lock.release()
 
-            if args.debug_mode == 1:
+            if args.debug_mode == 2:
                 print("Len of events: ", len(data))
 
             if data:

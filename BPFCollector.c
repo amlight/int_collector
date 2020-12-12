@@ -11,6 +11,7 @@
 
 #define INT_DST_PORT _INT_DST_PORT
 #define MAX_INT_HOP _MAX_INT_HOP
+
 #define MAX_INT_HOP_NOVIFLOW 10
 
 // __packed__ size
@@ -24,7 +25,8 @@
 #define HOP_LATENCY 2000
 #define FLOW_LATENCY 50000
 #define QUEUE_OCCUP 135 // 135 * 80 bytes = 10KB
-// #define TX_UTILIZE 50
+#define TX_UTILIZE 210000000  // 20Gbps
+#define BW_INTERVAL 100000000  // 10ms
 #define TIME_GAP_W 1000000000 //ns 1s  1 000 000 000
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
@@ -54,10 +56,10 @@ struct vlan_tp {
 } __attribute__((packed));
 
 /* Both TCP and UDP headers start with this struct */
-struct ports_t {
-    u16 source;
-    u16 dest;
-} __attribute__((packed));
+//struct ports_t {
+//    u16 source;
+//    u16 dest;
+//} __attribute__((packed));
 
 /* INT Telemetry report */
 struct telemetry_report_v10_t {
@@ -135,32 +137,36 @@ struct INT_md_fix_v10_t {
 
 // Data
 
+/* Identifying a flow at AmLight (L2VPN) */
 struct flow_id_t {
     u16 vlan_id;
     u32 last_sw_id;
     u16 last_egr_id;
 };
 
-struct egr_tx_id_t {
-    u32 sw_id;
-    u16 p_id;
-};
-
+/* Identifying a network interface's queue */
 struct queue_id_t {
     u32 sw_id;
     u16 p_id;
     u16 q_id;
 };
 
+/* Queue Occupancy */
 struct queue_info_t {
     u16 occup;
     u32 q_time;
 };
 
-struct egr_tx_info_t {
+/* Identifying a network interface */
+struct egr_tx_id_t {
     u32 sw_id;
     u16 p_id;
-    u64 util;
+};
+
+/* Egress Interface utilization */
+struct egr_tx_info_t {
+    u64 octets;
+    u64 time_ns;
 };
 
 // Events
@@ -168,6 +174,7 @@ struct egr_tx_info_t {
 // TODO: flow ID is just vlan_id. Extend it to be <last_sw, eg_id, vlan>
 // TODO: Change to u16 is_hop_latency:12 since we plan to use 10 switches (12 bits)
 struct flow_info_t {
+    u32 seqNumber;
     u16 vlan_id;
     u8 num_INT_hop;
     u8 hop_negative; // In case there is an error
@@ -181,8 +188,12 @@ struct flow_info_t {
     u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
 
+    /* Create egress utilization manually since
+       Noviflow doesn't support it */
+    u64 tx_utilize[MAX_INT_HOP];
+    u64 tx_utilize_delta[MAX_INT_HOP];
+
     u32 flow_latency;
-    //u32 flow_sink_time;  // sink timestamp provided
     u64 flow_sink_time;  // sink timestamp provided
 
     u8 is_n_flow;  // is new flow?
@@ -190,13 +201,15 @@ struct flow_info_t {
 
     u8 is_hop_latency;
     u8 is_queue_occup;
+    u8 is_tx_utilize;
+
 };
 
 BPF_PERF_OUTPUT(events);
 
 BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
-BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_util, 3200);
+BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 640);
 
 //--------------------------------------------------------------------
 
@@ -244,13 +257,7 @@ int collector(struct xdp_md *ctx) {
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
 
-//    struct ports_t *in_ports;
-//    CURSOR_ADVANCE(in_ports, cursor, sizeof(*in_ports), data_end);
-
     // NoviFlow adds INT between TCP and TCP Options
-//    u8 remain_size = (in_ip->protocol == IPPROTO_UDP)?
-//                      (UDPHDR_SIZE - sizeof(*in_ports)) :
-//                      (TCPHDR_SIZE - sizeof(*in_ports));
     u8 remain_size = (in_ip->protocol == IPPROTO_UDP)?
                       (UDPHDR_SIZE):(TCPHDR_SIZE);
     CURSOR_ADVANCE_NO_PARSE(cursor, remain_size, data_end);
@@ -261,21 +268,19 @@ int collector(struct xdp_md *ctx) {
     struct INT_md_fix_v10_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
 
-    /*
-        Parse INT data
-    */
 
+    /*****************  Parse INT data ***************** /
+
+    /* TODO: Get the max_int_hop from the telemetry report */
 //    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
     u8 num_INT_hop = 10 - 4;
 
-
     struct flow_info_t flow_info = {
+        .seqNumber = ntohl(tm_rp->seqNumber),
         .vlan_id = ntohs(vlan->vid),
         .num_INT_hop = INT_md_fix->remainHopCnt,
         .flow_sink_time = current_time_ns
     };
-
-//    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - flow_info.num_INT_hop;
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
     // Assume that sw_id is always presented.
@@ -289,7 +294,6 @@ int collector(struct xdp_md *ctx) {
     /* NoviFlow doesn't support other instructions */
 
     u32* INT_data;
- //   u8 _num_INT_hop = num_INT_hop;
 
     #pragma unroll
     for (u8 i = 0; i < num_INT_hop; i++) {
@@ -323,17 +327,10 @@ int collector(struct xdp_md *ctx) {
             flow_info.hop_latencies[i] = 400;
         }
 
-        // no need for the final round
-//        if (i < MAX_INT_HOP - 1) {
-//            _num_INT_hop--;
-//            if (_num_INT_hop <= 0)
-//                break;
-//        }
     }
 
-    /*
-        Path store and change-detection
-    */
+
+    /***************  Path store and change-detection  ***************/
 
     u8 is_update = 0;
 
@@ -346,7 +343,7 @@ int collector(struct xdp_md *ctx) {
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
 
     // Debug: Send all flows. Use with caution!
-    //flow_info.is_flow = 1;
+//    flow_info.is_flow = 1;
 
     if (unlikely(!flow_info_p)) {
 
@@ -387,7 +384,6 @@ int collector(struct xdp_md *ctx) {
             is_update = 1;
         }
 
-//        _num_INT_hop = num_INT_hop;
         #pragma unroll
         for (u8 i = 0; i < num_INT_hop; i++) {
 
@@ -408,78 +404,66 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
             }
 
-            // no need for the final round
-//            if (i < MAX_INT_HOP - 1) {
-//                _num_INT_hop--;
-//                if (_num_INT_hop <= 0)
-//                    break;
-//            }
         }
     }
 
     if (is_update)
         tb_flow.update(&flow_id, &flow_info);
 
-    /*
-        Egress info
-    */
 
-//    struct egr_info_t *egr_info_p;
-//    struct egr_id_t egr_id = {};
-//    struct egr_info_t egr_info;
-//
-//    _num_INT_hop = num_INT_hop;
-//    #pragma unroll
-//    for (u8 i = 0; i < MAX_INT_HOP; i++) {
-//        if (is_in_e_port_ids & is_tx_utilizes) {
-//            if (_num_INT_hop <= 0)
-//                break;
-//
-//            egr_id.sw_id  = flow_info.sw_ids[i];
-//            egr_id.p_id = flow_info.e_port_ids[i];
-//
-//            egr_info.egr_time    = flow_info.egr_times[i];
-//            egr_info.tx_utilize  = flow_info.tx_utilizes[i];
-//
-//            is_update = 0;
-//
-//            egr_info_p = tb_egr.lookup(&egr_id);
-//            if(unlikely(!egr_info_p)) {
-//
-//                flow_info.is_tx_utilize |= 1 << i;
-//                is_update = 1;
-//            }
-//            else {
-//
-//                if (unlikely(ABS(egr_info.tx_utilize, egr_info_p->tx_utilize) > TX_UTILIZE)) {
-//
-//                    flow_info.is_tx_utilize |= 1 << i;
-//                    is_update = 1;
-//                }
-//
-//            }
-//
-//            if (is_update)
-//                tb_egr.update(&egr_id, &egr_info);
-//
-//            _num_INT_hop--;
-//        }
-//    }
+    /*****************  Egress info and flow bandwidth *****************/
 
-    /*
-        Queue info
-    */
+    struct egr_tx_info_t *egr_info_p;
+    struct egr_tx_id_t egr_id = {};
+    struct egr_tx_info_t egr_info;
+
+    u64 delta_time;
+
+    #pragma unroll
+    for (u8 i = 0; i < num_INT_hop; i++) {
+
+        egr_id.sw_id  = flow_info.sw_ids[i];
+        egr_id.p_id = flow_info.e_port_ids[i];
+
+        egr_info_p = tb_egr_util.lookup(&egr_id);
+        if(unlikely(!egr_info_p)) {
+            egr_info.octets = 0;
+            egr_info.time_ns = current_time_ns;
+            tb_egr_util.update(&egr_id, &egr_info);
+        }
+        else {
+            delta_time = current_time_ns - egr_info_p->time_ns;
+            egr_info.octets = 18 + ntohs(in_ip->tot_len) + egr_info_p->octets;
+
+            if (delta_time < 100000000){
+                egr_info.time_ns = egr_info_p->time_ns;
+                tb_egr_util.update(&egr_id, &egr_info);
+            }
+            else {
+
+                if(egr_info.octets > 336325760){
+                    flow_info.tx_utilize[i] = egr_info.octets;
+                    flow_info.tx_utilize_delta[i] = delta_time;
+                    flow_info.is_tx_utilize |= 1 << i;
+                }
+
+                egr_info.octets = 0;
+                egr_info.time_ns = current_time_ns;
+                tb_egr_util.update(&egr_id, &egr_info);
+            }
+        }
+    }
+
+
+    /*****************  Queue info  *****************/
 
     struct queue_info_t *queue_info_p;
     struct queue_id_t queue_id = {};
     struct queue_info_t queue_info = {};
 
-//    _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < num_INT_hop; i++) {
         if (is_queue_occups) {
-//            if (_num_INT_hop <= 0)
-//                break;
 
             queue_id.sw_id = flow_info.sw_ids[i];
             queue_id.p_id = flow_info.e_port_ids[i];
@@ -507,16 +491,16 @@ int collector(struct xdp_md *ctx) {
             if (is_update)
                 tb_queue.update(&queue_id, &queue_info);
 
-//            _num_INT_hop--;
         }
     }
 
     // submit event info to user space
-    if (unlikely(flow_info.is_n_flow |
+    if (unlikely(flow_info.is_tx_utilize |
+                 flow_info.is_n_flow |
                  flow_info.is_hop_latency |
                  flow_info.is_queue_occup |
-              // flow_info.is_tx_utilize |
-                 flow_info.is_flow))
+                 flow_info.is_flow
+                 ))
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
 
 DROP:
