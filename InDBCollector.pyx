@@ -109,7 +109,7 @@ class InDBCollector(object):
             cdef Event *event = <Event*> _event
 
             # Print event data for debug
-            if self.debug_mode==1:
+            if self.debug_mode==1 and event.num_INT_hop != 9:
                 print("*********")
                 print("hop_negative", event.hop_negative)
                 print("seqNumber", event.seqNumber)
@@ -131,6 +131,7 @@ class InDBCollector(object):
                 print("is_flow", event.is_flow)
                 print("is_hop_latency", event.is_hop_latency)
                 print("is_queue_occup", event.is_queue_occup)
+                print("is_tx_utilize", event.is_tx_utilize)
 
             event_data = []
 
@@ -160,12 +161,12 @@ class InDBCollector(object):
             if event.is_tx_utilize:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_tx_utilize >> i) & 0x01:
-                        bw = (int(event.tx_utilize[i]))/(int(event.tx_utilize_delta[i]))
+                        bw = (event.tx_utilize[i])/(event.tx_utilize_delta[i]/1000000000.0)
                         event_data.append(u"port_tx_utilize\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" % (
                                            event.sw_ids[i], event.e_port_ids[i], event.queue_ids[i], bw,
                                            ' %d' % event.egr_times[i] if self.int_time else ''))
 
-            # This is ready:
+            # # This is ready:
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_queue_occup >> i) & 0x01:
