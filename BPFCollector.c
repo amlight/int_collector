@@ -4,7 +4,7 @@
 #include <linux/if_packet.h>
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
-#include <linux/ipv6.h>
+#include <linux/ipv6.h>  // <-- if removed, UDP errors. Find out why
 
 #define ETHTYPE_IP 0x0800
 #define ETHTYPE_VLAN 33024
@@ -24,7 +24,8 @@
 // TODO: FIX03 set these values from use space
 #define HOP_LATENCY 2000
 #define FLOW_LATENCY 50000
-#define QUEUE_OCCUP 135 // 135 * 80 bytes = 10KB
+// #define QUEUE_OCCUP 135 // 135 * 80 bytes = 10KB
+#define QUEUE_OCCUP 80 // 80 * 80 bytes = 640B
 //#define TX_UTILIZE 210000000  // 20Gbps
 //#define BW_INTERVAL 100000000  // 10ms
 #define TIME_GAP_W 1000000000 //ns 1s  1 000 000 000
@@ -51,7 +52,7 @@ struct eth_tp {
 
 /* VLAN Ethertype */
 struct vlan_tp {
-    u16 vid; // TODO: FIX04 change to u16 vid:12
+    u16 vid;
     u16 type;
 } __attribute__((packed));
 
@@ -196,8 +197,6 @@ struct flow_info_t {
     u8 is_hop_latency;
     u8 is_queue_occup;
     u8 is_tx_utilize;
-
-    u64 packet_number;
 };
 
 BPF_PERF_OUTPUT(events);
@@ -206,14 +205,16 @@ BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
 BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 640);
 
+BPF_HISTOGRAM(counter_all, u64);
+BPF_HISTOGRAM(counter_int, u64);
+
 //--------------------------------------------------------------------
 
 int collector(struct xdp_md *ctx) {
 
-    /* Counter for packets parsed */
-    static int counter = 0;
-
-    counter++;
+    // Counter
+    u64 value = 0;  // Packets received == 0
+    counter_all.increment(value);
 
     /* Timestamp when packet was received */
     u64 current_time_ns = bpf_ktime_get_ns();
@@ -229,17 +230,17 @@ int collector(struct xdp_md *ctx) {
     struct eth_tp *eth;
     CURSOR_ADVANCE(eth, cursor, sizeof(*eth), data_end);
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
-        return XDP_PASS;
+        goto PASS;
 
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
     if (unlikely(ip->protocol != IPPROTO_UDP))
-        return XDP_PASS;
+        goto PASS;
 
     struct udphdr *udp;
     CURSOR_ADVANCE(udp, cursor, sizeof(*udp), data_end);
     if (unlikely(ntohs(udp->dest) != INT_DST_PORT))
-        return XDP_PASS;
+        goto PASS;
 
     struct telemetry_report_v10_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
@@ -247,13 +248,16 @@ int collector(struct xdp_md *ctx) {
     /*
         Parse Inner: Ether->Vlan->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
-        TODO: Consider an extra VLAN (QinQ)
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
 
     struct vlan_tp *vlan;
     CURSOR_ADVANCE(vlan, cursor, sizeof(*vlan), data_end);
+
+    // Consider an extra VLAN (QinQ)
+    if (unlikely(ntohs(vlan->type) == ETHTYPE_VLAN))
+        CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*vlan), data_end);
 
     struct iphdr *in_ip;
     CURSOR_ADVANCE(in_ip, cursor, sizeof(*in_ip), data_end);
@@ -269,19 +273,22 @@ int collector(struct xdp_md *ctx) {
     struct INT_md_fix_v10_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
 
+    if (unlikely(INT_shim->length != 9))
+        // TODO: Identify which packets have length > 9 since there is only one switch
+        return XDP_PASS;
 
     /*****************  Parse INT data ***************** /
 
     /* TODO: Get the max_int_hop from the telemetry report */
-//    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
-    u8 num_INT_hop = 10 - 4;
+    // u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
+    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - 9;
 
     struct flow_info_t flow_info = {
         .seqNumber = ntohl(tm_rp->seqNumber),
-        .vlan_id = ntohs(vlan->vid),
+        .vlan_id = ntohs(vlan->vid) & 0x0fff,
         .num_INT_hop = INT_md_fix->remainHopCnt,
-        .flow_sink_time = current_time_ns,
-        .packet_number = counter,
+        // .num_INT_hop = INT_shim->length, // debug
+        .flow_sink_time = current_time_ns
     };
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
@@ -331,7 +338,6 @@ int collector(struct xdp_md *ctx) {
 
     }
 
-
     /***************  Path store and change-detection  ***************/
 
     u8 is_update = 0;
@@ -339,7 +345,7 @@ int collector(struct xdp_md *ctx) {
     struct flow_id_t flow_id = {};
 
     flow_id.vlan_id = flow_info.vlan_id;
-    flow_id.last_sw_id = flow_info.sw_ids[0];
+    flow_id.last_sw_id = flow_info.sw_ids[0];  // Last switch
     flow_id.last_egr_id = flow_info.e_port_ids[0];
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
@@ -430,16 +436,21 @@ int collector(struct xdp_md *ctx) {
             delta_time = current_time_ns - egr_info_p->time_ns;
             egr_info.octets = 18 + ntohs(in_ip->tot_len) + egr_info_p->octets;
 
-            if (delta_time < 100000000){
+            // Changing from 100ms (100000000) to 500ms (500000000) for tests
+            if (delta_time < 500000000){
                 egr_info.time_ns = egr_info_p->time_ns;
             }
             else {
 
-                if(egr_info.octets > 336325760){
-                    flow_info.tx_utilize[i] = egr_info.octets;
-                    flow_info.tx_utilize_delta[i] = delta_time;
-                    flow_info.is_tx_utilize |= 1 << i;
-                }
+//                if(egr_info.octets > 336325760){
+//                    flow_info.tx_utilize[i] = egr_info.octets;
+//                    flow_info.tx_utilize_delta[i] = delta_time;
+//                    flow_info.is_tx_utilize |= 1 << i;
+//                }
+
+                flow_info.tx_utilize[i] = egr_info.octets;
+                flow_info.tx_utilize_delta[i] = delta_time;
+                flow_info.is_tx_utilize |= 1 << i;
 
                 egr_info.octets = 0;
                 egr_info.time_ns = current_time_ns;
@@ -487,7 +498,8 @@ int collector(struct xdp_md *ctx) {
 
         }
     }
-
+    // debug:
+    //flow_info.is_flow = 1;
     // submit event info to user space
     if (unlikely(flow_info.is_tx_utilize |
                  flow_info.is_n_flow |
@@ -496,7 +508,12 @@ int collector(struct xdp_md *ctx) {
                  flow_info.is_flow
                  ))
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
+        value = 2;
+        counter_int.increment(value);
 
 DROP:
     return XDP_DROP;
+
+PASS:
+    return XDP_PASS;
 }
