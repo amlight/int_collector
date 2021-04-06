@@ -35,6 +35,8 @@ cdef struct Event:
     unsigned char  is_queue_occup
     unsigned char  is_tx_utilize
 
+    unsigned long packet_number
+
 
 class InDBCollector(object):
     """docstring for InDBCollector"""
@@ -131,6 +133,7 @@ class InDBCollector(object):
                 print("is_flow", event.is_flow)
                 print("is_hop_latency", event.is_hop_latency)
                 print("is_queue_occup", event.is_queue_occup)
+                print("packet_number", event.counter)
 
             event_data = []
 
@@ -138,9 +141,10 @@ class InDBCollector(object):
             if event.is_n_flow or event.is_flow:
                 path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
 
-                event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
+                event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,counter=%d,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
                                     event.vlan_id,
                                     event.sw_ids[0],
+                                    events.counter,
                                     event.e_port_ids[0],
                                     event.flow_latency,
                                     path_str,
@@ -149,9 +153,10 @@ class InDBCollector(object):
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_hop_latency >> i) & 0x01:
-                        event_data.append(u"flow_hop_latency\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d\\,sw_hop=%i value=%d%s" % (
+                        event_data.append(u"flow_hop_latency\\,vlan_id=%d\\,sw_id=%i\\,counter=%d,eg_id=%d\\,sw_hop=%i value=%d%s" % (
                                     event.vlan_id,
                                     event.sw_ids[0],
+                                    event.counter,
                                     event.e_port_ids[0],
                                     event.sw_ids[i],
                                     event.hop_latencies[i],

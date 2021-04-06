@@ -197,6 +197,7 @@ struct flow_info_t {
     u8 is_queue_occup;
     u8 is_tx_utilize;
 
+    u64 packet_number;
 };
 
 BPF_PERF_OUTPUT(events);
@@ -208,6 +209,11 @@ BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 640
 //--------------------------------------------------------------------
 
 int collector(struct xdp_md *ctx) {
+
+    /* Counter for packets parsed */
+    static int counter = 0;
+
+    counter++;
 
     /* Timestamp when packet was received */
     u64 current_time_ns = bpf_ktime_get_ns();
@@ -274,7 +280,8 @@ int collector(struct xdp_md *ctx) {
         .seqNumber = ntohl(tm_rp->seqNumber),
         .vlan_id = ntohs(vlan->vid),
         .num_INT_hop = INT_md_fix->remainHopCnt,
-        .flow_sink_time = current_time_ns
+        .flow_sink_time = current_time_ns,
+        .packet_number = counter,
     };
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
