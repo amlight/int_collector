@@ -411,6 +411,7 @@ int collector(struct xdp_md *ctx) {
 
     if (is_update)
         tb_flow.update(&flow_id, &flow_info);
+        events.perf_submit(ctx, &flow_id, sizeof(flow_id));
 
 
     /*****************  Egress info and flow bandwidth *****************/
@@ -507,7 +508,6 @@ int collector(struct xdp_md *ctx) {
                  flow_info.is_queue_occup |
                  flow_info.is_flow
                  ))
-        events.perf_submit(ctx, &flow_info, sizeof(flow_info));
         value = 2;
         counter_int.increment(value);
 

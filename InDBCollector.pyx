@@ -2,39 +2,47 @@ from __future__ import print_function
 import threading
 from bcc import BPF
 from influxdb import InfluxDBClient
-from libc.stdint cimport uintptr_t
+import ctypes as ct
 
-# TODO: FIX01
-cdef enum: __MAX_INT_HOP = 6
-_MAX_INT_HOP = __MAX_INT_HOP
-cdef struct Event:
-    unsigned int seqNumber
-    unsigned short vlan_id
-    unsigned char  num_INT_hop
-    unsigned char  hop_negative
+_MAX_INT_HOP = 6
 
-    unsigned int   sw_ids[__MAX_INT_HOP]
-    unsigned short in_port_ids[__MAX_INT_HOP]
-    unsigned short e_port_ids[__MAX_INT_HOP]
-    unsigned int   hop_latencies[__MAX_INT_HOP]
-    unsigned short queue_ids[__MAX_INT_HOP]
-    unsigned short queue_occups[__MAX_INT_HOP]
-    unsigned int   ingr_times[__MAX_INT_HOP]
-    unsigned int   egr_times[__MAX_INT_HOP]
+class FlowID(ct.Structure):
+    _fields_ = [
+        ("vlan_id", ct.c_ushort),
+        ("last_sw_id", ct.c_uint),
+        ("last_egr_id", ct.c_ushort),
+    ]
 
-    unsigned long int tx_utilize[__MAX_INT_HOP]
-    unsigned long int tx_utilize_delta[__MAX_INT_HOP]
+class Event(ct.Structure):
+    __MAX_INT_HOP = _MAX_INT_HOP
+    _fields_ = [
+        ("seqNumber", ct.c_uint),
+        ("vlan_id", ct.c_ushort),
+        ("num_INT_hop", ct.c_ubyte),
+        ("hop_negative", ct.c_ubyte),
 
-    unsigned int   flow_latency
-    unsigned long int   flow_sink_time
+        ("sw_ids", ct.c_uint * __MAX_INT_HOP),
+        ("int_port_ids", ct.c_ushort * __MAX_INT_HOP),
+        ("e_port_ids", ct.c_ushort * __MAX_INT_HOP),
+        ("hop_latencies", ct.c_uint * __MAX_INT_HOP),
+        ("queue_ids", ct.c_ushort * __MAX_INT_HOP),
+        ("queue_occups", ct.c_ushort * __MAX_INT_HOP),
+        ("ingr_times", ct.c_uint * __MAX_INT_HOP),
+        ("egr_times", ct.c_uint * __MAX_INT_HOP),
 
-    unsigned char  is_n_flow
-    unsigned char  is_flow
+        ("tx_utilize", ct.c_ulong * __MAX_INT_HOP),
+        ("tx_utilize_delta", ct.c_ulong * __MAX_INT_HOP),
 
-    unsigned char  is_hop_latency
-    unsigned char  is_queue_occup
-    unsigned char  is_tx_utilize
+        ("flow_latency", ct.c_uint),
+        ("flow_sink_time", ct.c_ulong),
 
+        ("is_n_flow", ct.c_ubyte),
+        ("is_flow", ct.c_ubyte),
+
+        ("is_hop_latency", ct.c_ubyte),
+        ("is_queue_occup", ct.c_ubyte),
+        ("is_tx_utilize", ct.c_ubyte),
+    ]
 
 class InDBCollector(object):
     """docstring for InDBCollector"""
@@ -107,8 +115,9 @@ class InDBCollector(object):
 
         def _process_event(ctx, data, size):
 
-            cdef uintptr_t _event =  <uintptr_t> data
-            cdef Event *event = <Event*> _event
+            flow_id = ct.cast(data, ct.POINTER(FlowID)).contents
+
+            event = ct.cast(self.tb_flow[flow_id], ct.POINTER(Event)).contents
 
             # Print event data for debug
             if self.debug_mode==1:
