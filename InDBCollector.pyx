@@ -151,16 +151,17 @@ class InDBCollector(object):
             event_data = []
 
             # TODO: FIX02: Review these inputs
-            if event.is_n_flow or event.is_flow:
-                path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
-
-                event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
-                                    event.vlan_id,
-                                    event.sw_ids[0],
-                                    event.e_port_ids[0],
-                                    event.flow_latency,
-                                    path_str,
-                                    ' %d' % event.flow_sink_time if self.int_time else ''))
+            # Commented out because by April 2021, there is only one switch.
+            # if event.is_n_flow or event.is_flow:
+            #     path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
+            #
+            #     event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
+            #                         event.vlan_id,
+            #                         event.sw_ids[0],
+            #                         event.e_port_ids[0],
+            #                         event.flow_latency,
+            #                         path_str,
+            #                         ' %d' % event.flow_sink_time if self.int_time else ''))
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
@@ -191,14 +192,6 @@ class InDBCollector(object):
                                            event.queue_ids[i],
                                            event.queue_occups[i],
                                            ' %d' % event.egr_times[i] if self.int_time else ''))
-
-            for k, v in sorted(self.packet_counter_all.items()):
-                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
-                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
-
-            for k, v in sorted(self.packet_counter_int.items()):
-                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
-                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
 
             self.lock.acquire()
             self.event_data.extend(event_data)

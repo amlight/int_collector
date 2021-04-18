@@ -25,7 +25,7 @@ def parse_params():
                         help="Database name")
 
     parser.add_argument("-P", "--event_period", default=0.2, type=float,
-                        help="Time period to push event data")
+                        help="Interval in seconds to push event data. Default: 0.2 seconds.")
 
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
                         help="Set to 1 to print event")
@@ -107,6 +107,29 @@ if __name__ == "__main__":
     event_push = threading.Thread(target=_event_push)
     event_push.start()
 
+    # Collecting and exporting data from tables instead of events.
+    def _gather_counters():
+
+        while not push_stop_flag.is_set():
+
+            time.sleep(args.event_period)
+            event_data = []
+
+            for k, v in sorted(collector.packet_counter_all.items()):
+                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
+                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
+
+            for k, v in sorted(collector.packet_counter_int.items()):
+                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
+                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
+
+            if event_data:
+                collector.client.write_points(points=event_data, protocol="line")
+            del event_data
+
+    gather_counters = threading.Thread(target=_gather_counters)
+    gather_counters.start()
+
     # Start polling events
     collector.open_events()
 
@@ -123,6 +146,7 @@ if __name__ == "__main__":
     finally:
         push_stop_flag.set()
         event_push.join()
+        gather_counters.join()
 
         collector.detach_all_iface()
         print("Done")
