@@ -12,7 +12,6 @@
 #define HOP_LATENCY _HOP_LATENCY
 #define FLOW_LATENCY _FLOW_LATENCY
 #define QUEUE_OCCUP _QUEUE_OCCUP
-#define BW_INTERVAL _BW_INTERVAL
 #define TIME_GAP_W _TIME_GAP_W
 
 #define MAX_INT_HOP_NOVIFLOW 10
@@ -160,7 +159,6 @@ struct egr_tx_id_t {
 struct egr_tx_info_t {
     u64 octets;
     u64 packets;
-//    u64 time_ns;
 };
 
 // Events
@@ -181,21 +179,12 @@ struct flow_info_t {
     u16 queue_occups[MAX_INT_HOP];
     u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
-
-    /* Create egress utilization manually since
-       Noviflow doesn't support it */
-    u64 tx_utilize[MAX_INT_HOP];
-    u64 tx_utilize_delta[MAX_INT_HOP];
-
     u32 flow_latency;
     u64 flow_sink_time;  // sink timestamp provided
-
     u8 is_n_flow;  // is new flow?
     u8 is_flow;
-
     u8 is_hop_latency;
     u8 is_queue_occup;
-    u8 is_tx_utilize;
 };
 
 BPF_PERF_OUTPUT(events);
@@ -274,7 +263,7 @@ int collector(struct xdp_md *ctx) {
 
     if (unlikely(INT_shim->length != 9))
         // TODO: Identify which packets have length > 9 since there is only one switch
-        return XDP_PASS;
+        goto PASS;
 
     /*****************  Parse INT data ***************** /
 
@@ -418,8 +407,6 @@ int collector(struct xdp_md *ctx) {
     struct egr_tx_info_t egr_info;
     struct egr_tx_id_t egr_id = {};
 
-//    u64 delta_time;
-
     #pragma unroll
     for (u8 i = 0; i < num_INT_hop; i++) {
 
@@ -431,26 +418,10 @@ int collector(struct xdp_md *ctx) {
         if(unlikely(!egr_info_p)) {
             egr_info.octets = 0;
             egr_info.packets = 0;
-//            egr_info.time_ns = current_time_ns;
         }
         else {
-//            delta_time = current_time_ns - egr_info_p->time_ns;
             egr_info.octets = 18 + ntohs(in_ip->tot_len) + egr_info_p->octets;
             egr_info.packets = 1 + egr_info_p->packets;
-
-//            if (delta_time < 500000000){
-//                egr_info.time_ns = egr_info_p->time_ns;
-//            }
-//            else {
-//
-//                flow_info.tx_utilize[i] = egr_info.octets;
-//                flow_info.tx_utilize_delta[i] = delta_time;
-//                flow_info.is_tx_utilize |= 1 << i;
-//
-//                egr_info.octets = 0;
-//                egr_info.packets = 0;
-//                egr_info.time_ns = current_time_ns;
-//            }
         }
         tb_egr_util.update(&egr_id, &egr_info);
     }
@@ -497,8 +468,7 @@ int collector(struct xdp_md *ctx) {
     // debug:
     //flow_info.is_flow = 1;
     // submit event info to user space
-    if (unlikely(flow_info.is_tx_utilize |
-                 flow_info.is_n_flow |
+    if (unlikely(flow_info.is_n_flow |
                  flow_info.is_hop_latency |
                  flow_info.is_queue_occup |
                  flow_info.is_flow

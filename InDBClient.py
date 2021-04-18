@@ -45,8 +45,8 @@ def parse_params():
     parser.add_argument("--queue-occ", default=80, type=int,
                         help="Queue Occupancy variation to monitor")
 
-    parser.add_argument("--interface-util-interval", default=500000000, type=int,
-                        help="Interval in ns between recording interface egress utilization")
+    parser.add_argument("--interface-util-interval", default=0.5, type=int,
+                        help="Interval in seconds between recording interface egress utilization")
 
     parser.add_argument("--max-number-int-hops", default=6, type=int,
                         help="Max number of INT metadata to process")
@@ -69,7 +69,6 @@ if __name__ == "__main__":
                                             hop_latency=args.hop_latency,
                                             flow_latency=args.flow_latency,
                                             queue_occ=args.queue_occ,
-                                            intf_util_interval=args.interface_util_interval,
                                             max_hops=args.max_number_int_hops)
 
     for iface in args.ifaces:
@@ -112,7 +111,7 @@ if __name__ == "__main__":
 
         while not push_stop_flag.is_set():
 
-            time.sleep(args.event_period)
+            time.sleep(args.interface_util_interval)
             event_data = []
 
             for k, v in sorted(collector.packet_counter_all.items()):

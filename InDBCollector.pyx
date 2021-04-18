@@ -20,15 +20,12 @@ cdef struct Event:
     unsigned short queue_occups[__MAX_INT_HOP]
     unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
-    unsigned long int tx_utilize[__MAX_INT_HOP]
-    unsigned long int tx_utilize_delta[__MAX_INT_HOP]
     unsigned int   flow_latency
     unsigned long int   flow_sink_time
     unsigned char  is_n_flow
     unsigned char  is_flow
     unsigned char  is_hop_latency
     unsigned char  is_queue_occup
-    unsigned char  is_tx_utilize
 
 
 class InDBCollector(object):
@@ -43,7 +40,6 @@ class InDBCollector(object):
                  hop_latency=2000,  # 2 us
                  flow_latency=50000,  # 50 us
                  queue_occ=80,  # 80x80 = 6400 Bytes
-                 intf_util_interval=500000000,  # 50 ms
                  max_hops=6,  # 6 switches (Max supported under 4096 instructions. Line 8
                  flow_keepalive=1000000000):  # 1 s
 
@@ -54,7 +50,6 @@ class InDBCollector(object):
         self.hop_latency = hop_latency
         self.flow_latency = flow_latency
         self.queue_occ = queue_occ
-        self.intf_util_interval = intf_util_interval
         self.flow_keepalive = flow_keepalive
 
         self.int_time = False
@@ -69,7 +64,6 @@ class InDBCollector(object):
                                          "-D_HOP_LATENCY=%s" % self.int_dst_port,
                                          "-D_FLOW_LATENCY=%s" % self.flow_latency,
                                          "-D_QUEUE_OCCUP=%s" % self.queue_occ,
-                                         "-D_BW_INTERVAL=%s" % self.intf_util_interval,
                                          "-D_TIME_GAP_W=%s" % self.flow_keepalive
                                          ])
 
@@ -138,15 +132,12 @@ class InDBCollector(object):
                 print("queue_occups", event.queue_occups)
                 print("ingr_times", event.ingr_times)
                 print("egr_times", event.egr_times)
-                print("tx_utilize", event.tx_utilize)
-                print("tx_utilize_delta", event.tx_utilize_delta)
                 print("flow_latency", event.flow_latency)
                 print("flow_sink_time", event.flow_sink_time)
                 print("is_n_flow", event.is_n_flow)
                 print("is_flow", event.is_flow)
                 print("is_hop_latency", event.is_hop_latency)
                 print("is_queue_occup", event.is_queue_occup)
-                print("is_tx_utilize", event.is_tx_utilize)
 
             event_data = []
 
@@ -174,15 +165,6 @@ class InDBCollector(object):
                                     event.hop_latencies[i],
                                     ' %d' % event.egr_times[i] if self.int_time else ''))
 
-            if event.is_tx_utilize:
-                for i in range(0, event.num_INT_hop):
-                    if (event.is_tx_utilize >> i) & 0x01:
-                        bw = (event.tx_utilize[i])/(event.tx_utilize_delta[i]/1000000000.0)
-                        event_data.append(u"port_tx_utilize\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" % (
-                                           event.sw_ids[i], event.e_port_ids[i], event.queue_ids[i], bw,
-                                           ' %d' % event.egr_times[i] if self.int_time else ''))
-
-            # This is ready:
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_queue_occup >> i) & 0x01:
