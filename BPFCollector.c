@@ -151,14 +151,16 @@ struct queue_info_t {
 
 /* Identifying a network interface */
 struct egr_tx_id_t {
-    u32 sw_id;
-    u16 p_id;
+    u32 sw_id;  // Switch ID
+    u16 p_id;  // Egress Port ID
+    u16 q_id;  // Egress Queue ID
 };
 
 /* Egress Interface utilization */
 struct egr_tx_info_t {
     u64 octets;
-    u64 time_ns;
+    u64 packets;
+//    u64 time_ns;
 };
 
 // Events
@@ -200,7 +202,7 @@ BPF_PERF_OUTPUT(events);
 
 BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
-BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 640);
+BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 5120);
 
 BPF_HISTOGRAM(counter_all, u64);
 BPF_HISTOGRAM(counter_int, u64);
@@ -413,45 +415,42 @@ int collector(struct xdp_md *ctx) {
     /*****************  Egress info and flow bandwidth *****************/
 
     struct egr_tx_info_t *egr_info_p;
-    struct egr_tx_id_t egr_id = {};
     struct egr_tx_info_t egr_info;
+    struct egr_tx_id_t egr_id = {};
 
-    u64 delta_time;
+//    u64 delta_time;
 
     #pragma unroll
     for (u8 i = 0; i < num_INT_hop; i++) {
 
         egr_id.sw_id  = flow_info.sw_ids[i];
         egr_id.p_id = flow_info.e_port_ids[i];
+        egr_id.q_id = flow_info.queue_ids[i];
 
         egr_info_p = tb_egr_util.lookup(&egr_id);
         if(unlikely(!egr_info_p)) {
             egr_info.octets = 0;
-            egr_info.time_ns = current_time_ns;
+            egr_info.packets = 0;
+//            egr_info.time_ns = current_time_ns;
         }
         else {
-            delta_time = current_time_ns - egr_info_p->time_ns;
+//            delta_time = current_time_ns - egr_info_p->time_ns;
             egr_info.octets = 18 + ntohs(in_ip->tot_len) + egr_info_p->octets;
+            egr_info.packets = 1 + egr_info_p->packets;
 
-            // Changing from 100ms (100000000) to 500ms (500000000) for tests
-            if (delta_time < 500000000){
-                egr_info.time_ns = egr_info_p->time_ns;
-            }
-            else {
-
-//                if(egr_info.octets > 336325760){
-//                    flow_info.tx_utilize[i] = egr_info.octets;
-//                    flow_info.tx_utilize_delta[i] = delta_time;
-//                    flow_info.is_tx_utilize |= 1 << i;
-//                }
-
-                flow_info.tx_utilize[i] = egr_info.octets;
-                flow_info.tx_utilize_delta[i] = delta_time;
-                flow_info.is_tx_utilize |= 1 << i;
-
-                egr_info.octets = 0;
-                egr_info.time_ns = current_time_ns;
-            }
+//            if (delta_time < 500000000){
+//                egr_info.time_ns = egr_info_p->time_ns;
+//            }
+//            else {
+//
+//                flow_info.tx_utilize[i] = egr_info.octets;
+//                flow_info.tx_utilize_delta[i] = delta_time;
+//                flow_info.is_tx_utilize |= 1 << i;
+//
+//                egr_info.octets = 0;
+//                egr_info.packets = 0;
+//                egr_info.time_ns = current_time_ns;
+//            }
         }
         tb_egr_util.update(&egr_id, &egr_info);
     }
@@ -503,10 +502,11 @@ int collector(struct xdp_md *ctx) {
                  flow_info.is_hop_latency |
                  flow_info.is_queue_occup |
                  flow_info.is_flow
-                 ))
+                 )){
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
         value = 2;
         counter_int.increment(value);
+    }
 
 DROP:
     return XDP_DROP;

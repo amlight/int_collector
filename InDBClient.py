@@ -116,12 +116,16 @@ if __name__ == "__main__":
             event_data = []
 
             for k, v in sorted(collector.packet_counter_all.items()):
-                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
                 event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in sorted(collector.packet_counter_int.items()):
-                # print("DEST_PORT : %10d, COUNT : %10d" % (k.value, v.value))
                 event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
+
+            for k, v in collector.tb_egr.items():
+                event_data.append(u"port_tx_utilization_octets\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                                  (k.sw_id, k.p_id, k.q_id, v.octets))
+                event_data.append(u"port_tx_utilization_pkts\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                                  (k.sw_id, k.p_id, k.q_id, v.packets))
 
             if event_data:
                 collector.client.write_points(points=event_data, protocol="line")
