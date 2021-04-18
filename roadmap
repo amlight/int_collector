@@ -11,9 +11,6 @@ FIX02:
 Make sure all influxdb inserts are correct. self.int_time is not necessary. Should
 use the collector timestamp
 
-FIX03:
-Make hop_latency, flow_latency, queue_occ, maps to be dynamically set. Create an
-api for that.
 
 FIX04:
 Make VID a 12-bit field instead of 16. EVCs with Vlan PCP might become an issue.

@@ -6,29 +6,26 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>  // <-- if removed, UDP errors. Find out why
 
-#define ETHTYPE_IP 0x0800
-#define ETHTYPE_VLAN 33024
-
+// User Variables
 #define INT_DST_PORT _INT_DST_PORT
 #define MAX_INT_HOP _MAX_INT_HOP
+#define HOP_LATENCY _HOP_LATENCY
+#define FLOW_LATENCY _FLOW_LATENCY
+#define QUEUE_OCCUP _QUEUE_OCCUP
+#define BW_INTERVAL _BW_INTERVAL
+#define TIME_GAP_W _TIME_GAP_W
 
 #define MAX_INT_HOP_NOVIFLOW 10
 
+// __packet__ numbers
+#define ETHTYPE_IP 0x0800
+#define ETHTYPE_VLAN 33024
 // __packed__ size
 #define ETH_SIZE 14
 #define VLAN_SIZE 2
 #define TCPHDR_SIZE 20
 #define UDPHDR_SIZE 8
 #define INT_SHIM_SIZE 4
-
-// TODO: FIX03 set these values from use space
-#define HOP_LATENCY 2000
-#define FLOW_LATENCY 50000
-// #define QUEUE_OCCUP 135 // 135 * 80 bytes = 10KB
-#define QUEUE_OCCUP 80 // 80 * 80 bytes = 640B
-//#define TX_UTILIZE 210000000  // 20Gbps
-//#define BW_INTERVAL 100000000  // 10ms
-#define TIME_GAP_W 1000000000 //ns 1s  1 000 000 000
 
 #define CURSOR_ADVANCE(_target, _cursor, _len,_data_end) \
     ({  _target = _cursor; _cursor += _len; \

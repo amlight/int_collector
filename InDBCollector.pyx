@@ -4,15 +4,14 @@ from bcc import BPF
 from influxdb import InfluxDBClient
 from libc.stdint cimport uintptr_t
 
-# TODO: FIX01
-cdef enum: __MAX_INT_HOP = 6
-_MAX_INT_HOP = __MAX_INT_HOP
+# # TODO: FIX01
+cdef enum: __MAX_INT_HOP = 6  # Change to 10, max from noviflow
+# _MAX_INT_HOP = __MAX_INT_HOP
 cdef struct Event:
     unsigned int seqNumber
     unsigned short vlan_id
     unsigned char  num_INT_hop
     unsigned char  hop_negative
-
     unsigned int   sw_ids[__MAX_INT_HOP]
     unsigned short in_port_ids[__MAX_INT_HOP]
     unsigned short e_port_ids[__MAX_INT_HOP]
@@ -21,16 +20,12 @@ cdef struct Event:
     unsigned short queue_occups[__MAX_INT_HOP]
     unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
-
     unsigned long int tx_utilize[__MAX_INT_HOP]
     unsigned long int tx_utilize_delta[__MAX_INT_HOP]
-
     unsigned int   flow_latency
     unsigned long int   flow_sink_time
-
     unsigned char  is_n_flow
     unsigned char  is_flow
-
     unsigned char  is_hop_latency
     unsigned char  is_queue_occup
     unsigned char  is_tx_utilize
@@ -44,13 +39,24 @@ class InDBCollector(object):
                  debug_mode=0,
                  host="localhost",
                  database="INTdatabase",
-                 flags=0):
+                 flags=0,
+                 hop_latency=2000,  # 2 us
+                 flow_latency=50000,  # 50 us
+                 queue_occ=80,  # 80x80 = 6400 Bytes
+                 intf_util_interval=500000000,  # 50 ms
+                 max_hops=6,  # 6 switches (Max supported under 4096 instructions. Line 8
+                 flow_keepalive=1000000000):  # 1 s
 
         super(InDBCollector, self).__init__()
 
-        self.MAX_INT_HOP = _MAX_INT_HOP
-        # self.SERVER_MODE = "INFLUXDB"
-        self.INT_DST_PORT = int_dst_port
+        self.max_int_hops = max_hops
+        self.int_dst_port = int_dst_port
+        self.hop_latency = hop_latency
+        self.flow_latency = flow_latency
+        self.queue_occ = queue_occ
+        self.intf_util_interval = intf_util_interval
+        self.flow_keepalive = flow_keepalive
+
         self.int_time = False
 
         self.ifaces = set()
@@ -58,8 +64,15 @@ class InDBCollector(object):
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
                                  cflags=["-w",
-                                         "-D_MAX_INT_HOP=%s" % self.MAX_INT_HOP,
-                                         "-D_INT_DST_PORT=%s" % self.INT_DST_PORT])
+                                         "-D_MAX_INT_HOP=%s" % self.max_int_hops,
+                                         "-D_INT_DST_PORT=%s" % self.int_dst_port,
+                                         "-D_HOP_LATENCY=%s" % self.int_dst_port,
+                                         "-D_FLOW_LATENCY=%s" % self.flow_latency,
+                                         "-D_QUEUE_OCCUP=%s" % self.queue_occ,
+                                         "-D_BW_INTERVAL=%s" % self.intf_util_interval,
+                                         "-D_TIME_GAP_W=%s" % self.flow_keepalive
+                                         ])
+
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
         # get all the info table for the future.

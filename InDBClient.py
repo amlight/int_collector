@@ -36,6 +36,24 @@ def parse_params():
     parser.add_argument("-m", "--xdp-mode", default=0, type=int,
                         help="Set to 1 to hardware off. Default is Native mode")
 
+    parser.add_argument("--hop-latency", default=2000, type=int,
+                        help="Hop Latency variation in nanoseconds to monitor")
+
+    parser.add_argument("--flow-latency", default=50000, type=int,
+                        help="Flow Latency variation in nanoseconds to monitor")
+
+    parser.add_argument("--queue-occ", default=80, type=int,
+                        help="Queue Occupancy variation to monitor")
+
+    parser.add_argument("--interface-util-interval", default=500000000, type=int,
+                        help="Interval in ns between recording interface egress utilization")
+
+    parser.add_argument("--max-number-int-hops", default=6, type=int,
+                        help="Max number of INT metadata to process")
+
+    parser.add_argument("--flow_keepalive", default=1000000000, type=int,
+                        help="Interval in ns to report flows even if there are no changes")
+
     return parser.parse_args()
 
 
@@ -47,7 +65,12 @@ if __name__ == "__main__":
                                             debug_mode=args.debug_mode,
                                             host=args.host,
                                             database=args.database,
-                                            flags=args.xdp_mode)
+                                            flags=args.xdp_mode,
+                                            hop_latency=args.hop_latency,
+                                            flow_latency=args.flow_latency,
+                                            queue_occ=args.queue_occ,
+                                            intf_util_interval=args.interface_util_interval,
+                                            max_hops=args.max_number_int_hops)
 
     for iface in args.ifaces:
         collector.attach_iface(iface)
