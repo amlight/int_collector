@@ -24,7 +24,7 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    parser.add_argument("-P", "--event_period", default=1, type=float,
+    parser.add_argument("-P", "--event_period", default=0.2, type=float,
                         help="Time period to push event data")
 
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
@@ -86,7 +86,7 @@ if __name__ == "__main__":
 
     push_stop_flag = threading.Event()
 
-    # A separated thread to push event data
+    # A separated thread to push event data to the database
     def _event_push():
 
         while not push_stop_flag.is_set():
