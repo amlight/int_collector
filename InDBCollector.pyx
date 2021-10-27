@@ -5,7 +5,7 @@ from influxdb import InfluxDBClient
 from libc.stdint cimport uintptr_t
 
 # # TODO: FIX01
-cdef enum: __MAX_INT_HOP = 6  # Change to 10, max from noviflow
+cdef enum: __MAX_INT_HOP = 10  # 10 is the max for noviflow
 # _MAX_INT_HOP = __MAX_INT_HOP
 cdef struct Event:
     unsigned int seqNumber
@@ -40,7 +40,7 @@ class InDBCollector(object):
                  hop_latency=2000,  # 2 us
                  flow_latency=50000,  # 50 us
                  queue_occ=80,  # 80x80 = 6400 Bytes
-                 max_hops=6,  # 6 switches (Max supported under 4096 instructions. Line 8
+                 max_hops=10,  # 10 switches. Don't change that.
                  flow_keepalive=1000000000):  # 1 s
 
         super(InDBCollector, self).__init__()
@@ -61,7 +61,7 @@ class InDBCollector(object):
                                  cflags=["-w",
                                          "-D_MAX_INT_HOP=%s" % self.max_int_hops,
                                          "-D_INT_DST_PORT=%s" % self.int_dst_port,
-                                         "-D_HOP_LATENCY=%s" % self.int_dst_port,
+                                         "-D_HOP_LATENCY=%s" % self.hop_latency,
                                          "-D_FLOW_LATENCY=%s" % self.flow_latency,
                                          "-D_QUEUE_OCCUP=%s" % self.queue_occ,
                                          "-D_TIME_GAP_W=%s" % self.flow_keepalive

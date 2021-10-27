@@ -8,17 +8,17 @@
 
 // User Variables
 #define INT_DST_PORT _INT_DST_PORT
-#define MAX_INT_HOP _MAX_INT_HOP
+//#define MAX_INT_HOP _MAX_INT_HOP  // Noviflow only supports reports with 10 metadata
+#define MAX_INT_HOP 10  // Noviflow only supports reports with 10 metadata
 #define HOP_LATENCY _HOP_LATENCY
 #define FLOW_LATENCY _FLOW_LATENCY
 #define QUEUE_OCCUP _QUEUE_OCCUP
 #define TIME_GAP_W _TIME_GAP_W
 
-#define MAX_INT_HOP_NOVIFLOW 10
-
 // __packet__ numbers
 #define ETHTYPE_IP 0x0800
 #define ETHTYPE_VLAN 33024
+
 // __packed__ size
 #define ETH_SIZE 14
 #define VLAN_SIZE 2
@@ -148,11 +148,12 @@ struct queue_info_t {
     u32 q_time;
 };
 
-/* Identifying a network interface */
+/* Identifying a network interface & VLAN */
 struct egr_tx_id_t {
     u32 sw_id;  // Switch ID
     u16 p_id;  // Egress Port ID
     u16 q_id;  // Egress Queue ID
+    u16 v_id;  // VLAN ID
 };
 
 /* Egress Interface utilization */
@@ -165,6 +166,7 @@ struct egr_tx_info_t {
 
 // TODO: flow ID is just vlan_id. Extend it to be <last_sw, eg_id, vlan>
 // TODO: Change to u16 is_hop_latency:12 since we plan to use 10 switches (12 bits)
+// TODO: Change to u16 is_queue_occup:12 since we plan to use 10 switches (12 bits)
 struct flow_info_t {
     u32 seqNumber;
     u16 vlan_id;
@@ -189,6 +191,7 @@ struct flow_info_t {
 
 BPF_PERF_OUTPUT(events);
 
+// Maps
 BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
 BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 5120);
@@ -200,12 +203,12 @@ BPF_HISTOGRAM(counter_int, u64);
 
 int collector(struct xdp_md *ctx) {
 
+    /* Timestamp when packet was received */
+    u64 current_time_ns = bpf_ktime_get_ns();
+
     // Counter
     u64 value = 0;  // Packets received == 0
     counter_all.increment(value);
-
-    /* Timestamp when packet was received */
-    u64 current_time_ns = bpf_ktime_get_ns();
 
     void* data_end = (void*)(long)ctx->data_end;
     void* cursor = (void*)(long)ctx->data;
@@ -261,21 +264,19 @@ int collector(struct xdp_md *ctx) {
     struct INT_md_fix_v10_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
 
-    if (unlikely(INT_shim->length != 9))
-        // TODO: Identify which packets have length > 9 since there is only one switch
-        goto PASS;
+//     Disabling this temporarily since we are increasing the number of metadata
+//    if (unlikely(INT_shim->length != 9))
+//        // TODO: Identify which packets have length > 9 since there is only one switch
+//        goto PASS;
 
-    /*****************  Parse INT data ***************** /
+    /* ****************  Parse INT data **************** */
 
-    /* TODO: Get the max_int_hop from the telemetry report */
-    // u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - htons(INT_md_fix->remainHopCnt);
-    u8 num_INT_hop = MAX_INT_HOP_NOVIFLOW - 9;
+    u8 num_INT_hop = ABS(MAX_INT_HOP, INT_md_fix->remainHopCnt);
 
     struct flow_info_t flow_info = {
         .seqNumber = ntohl(tm_rp->seqNumber),
         .vlan_id = ntohs(vlan->vid) & 0x0fff,
-        .num_INT_hop = INT_md_fix->remainHopCnt,
-        // .num_INT_hop = INT_shim->length, // debug
+        .num_INT_hop = num_INT_hop,
         .flow_sink_time = current_time_ns
     };
 
@@ -292,8 +293,9 @@ int collector(struct xdp_md *ctx) {
 
     u32* INT_data;
 
+    u8 _num_INT_hop = num_INT_hop;
     #pragma unroll
-    for (u8 i = 0; i < num_INT_hop; i++) {
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.sw_ids[i] = ntohl(*INT_data);
 
@@ -322,6 +324,12 @@ int collector(struct xdp_md *ctx) {
         else{
             flow_info.hop_negative = 1;
             flow_info.hop_latencies[i] = 400;
+        }
+
+        if (i < MAX_INT_HOP - 1) {
+            _num_INT_hop--;
+            if (_num_INT_hop <= 0)
+                break;
         }
 
     }
@@ -374,9 +382,11 @@ int collector(struct xdp_md *ctx) {
             is_update = 1;
         }
 
+        _num_INT_hop = num_INT_hop;
         #pragma unroll
-        for (u8 i = 0; i < num_INT_hop; i++) {
+        for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
+            // TODO: FIX: Must check if ingress or egress ports are the same.
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
 
@@ -394,6 +404,12 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
             }
 
+            if (i < MAX_INT_HOP - 1) {
+                _num_INT_hop--;
+                if (_num_INT_hop <= 0)
+                    break;
+            }
+
         }
     }
 
@@ -407,12 +423,14 @@ int collector(struct xdp_md *ctx) {
     struct egr_tx_info_t egr_info;
     struct egr_tx_id_t egr_id = {};
 
+    _num_INT_hop = num_INT_hop;
     #pragma unroll
-    for (u8 i = 0; i < num_INT_hop; i++) {
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
         egr_id.sw_id  = flow_info.sw_ids[i];
         egr_id.p_id = flow_info.e_port_ids[i];
         egr_id.q_id = flow_info.queue_ids[i];
+        egr_id.v_id = flow_info.vlan_id;
 
         egr_info_p = tb_egr_util.lookup(&egr_id);
         if(unlikely(!egr_info_p)) {
@@ -424,8 +442,13 @@ int collector(struct xdp_md *ctx) {
             egr_info.packets = 1 + egr_info_p->packets;
         }
         tb_egr_util.update(&egr_id, &egr_info);
-    }
 
+        if (i < MAX_INT_HOP - 1) {
+            _num_INT_hop--;
+            if (_num_INT_hop <= 0)
+                break;
+        }
+    }
 
     /*****************  Queue info  *****************/
 
@@ -433,8 +456,9 @@ int collector(struct xdp_md *ctx) {
     struct queue_id_t queue_id = {};
     struct queue_info_t queue_info = {};
 
+    _num_INT_hop = num_INT_hop;
     #pragma unroll
-    for (u8 i = 0; i < num_INT_hop; i++) {
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
         if (is_queue_occups) {
 
             queue_id.sw_id = flow_info.sw_ids[i];
@@ -462,6 +486,12 @@ int collector(struct xdp_md *ctx) {
 
             if (is_update)
                 tb_queue.update(&queue_id, &queue_info);
+
+            if (i < MAX_INT_HOP - 1) {
+                _num_INT_hop--;
+                if (_num_INT_hop <= 0)
+                    break;
+            }
 
         }
     }
