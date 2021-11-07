@@ -149,11 +149,24 @@ struct queue_info_t {
 };
 
 /* Identifying a network interface & VLAN */
-struct egr_tx_id_t {
+struct egress_eg_q_vlan_id_t {
     u32 sw_id;  // Switch ID
     u16 p_id;  // Egress Port ID
     u16 q_id;  // Egress Queue ID
     u16 v_id;  // VLAN ID
+};
+
+/* Identifying a network interface  */
+struct egress_queue_util_id_t {
+    u32 sw_id;  // Switch ID
+    u16 p_id;  // Egress Port ID
+    u16 q_id;  // Egress Queue ID
+};
+
+/* Identifying a network interface  */
+struct egress_util_id_t {
+    u32 sw_id;  // Switch ID
+    u16 p_id;  // Egress Port ID
 };
 
 /* Egress Interface utilization */
@@ -194,7 +207,9 @@ BPF_PERF_OUTPUT(events);
 // Maps
 BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
-BPF_TABLE("lru_hash", struct egr_tx_id_t, struct egr_tx_info_t, tb_egr_util, 5120);
+BPF_TABLE("lru_hash", struct egress_eg_q_vlan_id_t, struct egr_tx_info_t, tb_egr_vlan_util, 5120);
+BPF_TABLE("lru_hash", struct egress_queue_util_id_t, struct egr_tx_info_t, tb_egr_queue_util, 520);
+BPF_TABLE("lru_hash", struct egress_util_id_t, struct egr_tx_info_t, tb_egr_interface_util, 400);
 
 BPF_HISTOGRAM(counter_all, u64);
 BPF_HISTOGRAM(counter_int, u64);
@@ -421,27 +436,62 @@ int collector(struct xdp_md *ctx) {
 
     struct egr_tx_info_t *egr_info_p;
     struct egr_tx_info_t egr_info;
-    struct egr_tx_id_t egr_id = {};
+    struct egress_eg_q_vlan_id_t egr_id = {};
+    struct egress_queue_util_id_t egr_q_id = {};
+    struct egress_util_id_t egr_int_id = {};
+    u64 packet_len = 18 + ntohs(in_ip->tot_len);
 
     _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
+        // Full details: interface + queue + vlan
         egr_id.sw_id  = flow_info.sw_ids[i];
         egr_id.p_id = flow_info.e_port_ids[i];
         egr_id.q_id = flow_info.queue_ids[i];
         egr_id.v_id = flow_info.vlan_id;
 
-        egr_info_p = tb_egr_util.lookup(&egr_id);
+        egr_info_p = tb_egr_vlan_util.lookup(&egr_id);
         if(unlikely(!egr_info_p)) {
             egr_info.octets = 0;
             egr_info.packets = 0;
         }
         else {
-            egr_info.octets = 18 + ntohs(in_ip->tot_len) + egr_info_p->octets;
+            egr_info.octets = packet_len + egr_info_p->octets;
             egr_info.packets = 1 + egr_info_p->packets;
         }
-        tb_egr_util.update(&egr_id, &egr_info);
+        tb_egr_vlan_util.update(&egr_id, &egr_info);
+
+        // interface + queue details
+        egr_q_id.sw_id  = flow_info.sw_ids[i];
+        egr_q_id.p_id = flow_info.e_port_ids[i];
+        egr_q_id.q_id = flow_info.queue_ids[i];
+
+        egr_info_p = tb_egr_queue_util.lookup(&egr_q_id);
+        if(unlikely(!egr_info_p)) {
+            egr_info.octets = 0;
+            egr_info.packets = 0;
+        }
+        else {
+            egr_info.octets = packet_len + egr_info_p->octets;
+            egr_info.packets = 1 + egr_info_p->packets;
+        }
+        tb_egr_queue_util.update(&egr_id, &egr_info);
+
+        // interface details
+        egr_int_id.sw_id  = flow_info.sw_ids[i];
+        egr_int_id.p_id = flow_info.e_port_ids[i];
+
+        egr_info_p = tb_egr_interface_util.lookup(&egr_int_id);
+        if(unlikely(!egr_info_p)) {
+            egr_info.octets = 0;
+            egr_info.packets = 0;
+        }
+        else {
+            egr_info.octets = packet_len + egr_info_p->octets;
+            egr_info.packets = 1 + egr_info_p->packets;
+        }
+        tb_egr_interface_util.update(&egr_id, &egr_info);
 
         if (i < MAX_INT_HOP - 1) {
             _num_INT_hop--;

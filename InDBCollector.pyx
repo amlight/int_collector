@@ -72,7 +72,9 @@ class InDBCollector(object):
         # get all the info table for the future.
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
-        self.tb_egr   = self.bpf_collector.get_table("tb_egr_util")
+        self.tb_egr   = self.bpf_collector.get_table("tb_egr_vlan_util")
+        self.tb_egr_q   = self.bpf_collector.get_table("tb_egr_queue_util")
+        self.tb_egr_int   = self.bpf_collector.get_table("tb_egr_interface_util")
 
         self.packet_counter_all = self.bpf_collector.get_table("counter_all")
         self.packet_counter_int = self.bpf_collector.get_table("counter_int")

@@ -126,8 +126,21 @@ if __name__ == "__main__":
                 event_data.append("port_tx_utilization_pkts\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d\\,vlan_id\\=%d value=%d" %
                                   (k.sw_id, k.p_id, k.q_id, k.v_id, v.packets))
 
-                # event_data.append(
-                #     f"{'port_tx_utilization_octets'} sw_id={k.sw_id},e_id={k.p_id},q_id={k.q_id},v_id={k.v_id},value={v.octets}i")
+            for k, v in collector.tb_egr_q.items():
+                event_data.append(
+                    "port_tx_utilization_octets_queue\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                    (k.sw_id, k.p_id, k.q_id, v.octets))
+                event_data.append(
+                    "port_tx_utilization_pkts_queue\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                    (k.sw_id, k.p_id, k.q_id, v.packets))
+
+            for k, v in collector.tb_egr_int.items():
+                event_data.append(
+                    "port_tx_utilization_octets_int\\,sw_id\\=%d\\,eg_id\\=%d value=%d" %
+                    (k.sw_id, k.p_id, v.octets))
+                event_data.append(
+                    "port_tx_utilization_pkts_int\\,sw_id\\=%d\\,eg_id\\=%d value=%d" %
+                    (k.sw_id, k.p_id, v.packets))
 
             if event_data:
                 # TODO: handle timeouts
