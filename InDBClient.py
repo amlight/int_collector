@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import os
 import argparse
 import threading
 import time
@@ -24,8 +25,8 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    parser.add_argument("-P", "--event_period", default=0.2, type=float,
-                        help="Interval in seconds to push event data. Default: 0.2 seconds.")
+    parser.add_argument("-P", "--event_period", default=0.5, type=float,
+                        help="Interval in seconds to push event data. Default: 0.5 seconds.")
 
     parser.add_argument("-d", "--debug_mode", default=0, type=int,
                         help="Set to 1 to print event")
@@ -43,16 +44,22 @@ def parse_params():
                         help="Flow Latency variation in nanoseconds to monitor")
 
     parser.add_argument("--queue-occ", default=80, type=int,
-                        help="Queue Occupancy variation to monitor")
+                        help="Queue Occupancy threshold to monitor")
 
     parser.add_argument("--interface-util-interval", default=0.5, type=int,
                         help="Interval in seconds between recording interface egress utilization")
 
-    parser.add_argument("--max-number-int-hops", default=6, type=int,
+    parser.add_argument("--max-number-int-hops", default=10, type=int,
                         help="Max number of INT metadata to process")
 
-    parser.add_argument("--flow_keepalive", default=1000000000, type=int,
+    parser.add_argument("--flow_keepalive", default=2000000000, type=int,
                         help="Interval in ns to report flows even if there are no changes")
+
+    parser.add_argument("--run-counter-mode-only", default=0, type=int,
+                        help="Run on Counter mode (only statistics)")
+
+    parser.add_argument("--run-threshold-mode-only", default=0, type=int,
+                        help="Run on Threshold mode (only queues and delays)")
 
     return parser.parse_args()
 
@@ -60,6 +67,9 @@ def parse_params():
 if __name__ == "__main__":
 
     args = parse_params()
+
+    enable_threshold = 0 if args.run_counter_mode_only else 1
+    enable_counter = 0 if args.run_threshold_mode_only else 1
 
     collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
                                             debug_mode=args.debug_mode,
@@ -69,13 +79,17 @@ if __name__ == "__main__":
                                             hop_latency=args.hop_latency,
                                             flow_latency=args.flow_latency,
                                             queue_occ=args.queue_occ,
-                                            max_hops=args.max_number_int_hops)
+                                            max_hops=args.max_number_int_hops,
+                                            flow_keepalive=args.flow_keepalive,
+                                            enable_counter_mode=enable_counter,
+                                            enable_threshold_mode=enable_threshold)
 
     for iface in args.ifaces:
+        _ = os.system("ifconfig %s promisc" % iface)
         collector.attach_iface(iface)
 
     # Test if database is not found,create one
-    if not len(collector.client.get_list_database()):
+    if args.database not in collector.client.get_list_database():
         collector.client.create_database(args.database)
 
     if args.new_measurements:
@@ -115,31 +129,31 @@ if __name__ == "__main__":
             event_data = []
 
             for k, v in sorted(collector.packet_counter_all.items()):
-                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
+                event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in sorted(collector.packet_counter_int.items()):
-                event_data.append("telemetry_packet_counter\\,type\\=%d value=%d" % (k.value, v.value))
+                event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in collector.tb_egr.items():
-                event_data.append("port_tx_utilization_octets\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d\\,vlan_id\\=%d value=%d" %
+                event_data.append("tx_octs\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d" %
                                   (k.sw_id, k.p_id, k.q_id, k.v_id, v.octets))
-                event_data.append("port_tx_utilization_pkts\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d\\,vlan_id\\=%d value=%d" %
+                event_data.append("tx_pkts\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d" %
                                   (k.sw_id, k.p_id, k.q_id, k.v_id, v.packets))
 
             for k, v in collector.tb_egr_q.items():
                 event_data.append(
-                    "port_tx_utilization_octets_queue\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                    "tx_octs_queue\\,sw\\=%d\\,port\\=%d\\,queue\\=%d value=%d" %
                     (k.sw_id, k.p_id, k.q_id, v.octets))
                 event_data.append(
-                    "port_tx_utilization_pkts_queue\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d" %
+                    "tx_pkts_queue\\,sw\\=%d\\,port\\=%d\\,queue\\=%d value=%d" %
                     (k.sw_id, k.p_id, k.q_id, v.packets))
 
             for k, v in collector.tb_egr_int.items():
                 event_data.append(
-                    "port_tx_utilization_octets_int\\,sw_id\\=%d\\,eg_id\\=%d value=%d" %
+                    "tx_octs_int\\,sw\\=%d\\,port\\=%d value=%d" %
                     (k.sw_id, k.p_id, v.octets))
                 event_data.append(
-                    "port_tx_utilization_pkts_int\\,sw_id\\=%d\\,eg_id\\=%d value=%d" %
+                    "tx_pkts_int\\,sw\\=%d\\,port\\=%d value=%d" %
                     (k.sw_id, k.p_id, v.packets))
 
             if event_data:
@@ -170,7 +184,7 @@ if __name__ == "__main__":
     # Start polling events
     collector.open_events()
 
-    print("eBPF progs Loaded")
+    print("eBPF progs Loaded.")
     sys.stdout.flush()
 
     try:
@@ -186,4 +200,6 @@ if __name__ == "__main__":
         gather_counters.join()
 
         collector.detach_all_iface()
+        for iface in args.ifaces:
+            _ = os.system("ifconfig %s -promisc" % iface)
         print("Done")

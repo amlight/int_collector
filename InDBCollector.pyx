@@ -16,8 +16,8 @@ cdef struct Event:
     unsigned short in_port_ids[__MAX_INT_HOP]
     unsigned short e_port_ids[__MAX_INT_HOP]
     unsigned int   hop_latencies[__MAX_INT_HOP]
-    unsigned short queue_ids[__MAX_INT_HOP]
-    unsigned short queue_occups[__MAX_INT_HOP]
+    unsigned char  queue_ids[__MAX_INT_HOP]
+    unsigned int   queue_occups[__MAX_INT_HOP]
     unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
     unsigned int   flow_latency
@@ -32,16 +32,18 @@ class InDBCollector(object):
     """docstring for InDBCollector"""
 
     def __init__(self,
-                 int_dst_port=5900,
-                 debug_mode=0,
-                 host="localhost",
-                 database="INTdatabase",
-                 flags=0,
-                 hop_latency=2000,  # 2 us
-                 flow_latency=50000,  # 50 us
-                 queue_occ=80,  # 80x80 = 6400 Bytes
-                 max_hops=10,  # 10 switches. Don't change that.
-                 flow_keepalive=1000000000):  # 1 s
+                 int_dst_port,
+                 debug_mode,
+                 host,
+                 database,
+                 flags,
+                 hop_latency,
+                 flow_latency,
+                 queue_occ,
+                 max_hops,
+                 flow_keepalive,
+                 enable_counter_mode,
+                 enable_threshold_mode):
 
         super(InDBCollector, self).__init__()
 
@@ -51,6 +53,8 @@ class InDBCollector(object):
         self.flow_latency = flow_latency
         self.queue_occ = queue_occ
         self.flow_keepalive = flow_keepalive
+        self.enable_counter_mode = enable_counter_mode
+        self.enable_threshold_mode = enable_threshold_mode
 
         self.int_time = False
 
@@ -64,7 +68,9 @@ class InDBCollector(object):
                                          "-D_HOP_LATENCY=%s" % self.hop_latency,
                                          "-D_FLOW_LATENCY=%s" % self.flow_latency,
                                          "-D_QUEUE_OCCUP=%s" % self.queue_occ,
-                                         "-D_TIME_GAP_W=%s" % self.flow_keepalive
+                                         "-D_TIME_GAP_W=%s" % self.flow_keepalive,
+                                         "-D_ENABLE_COUNTER_MODE=%s" % self.enable_counter_mode,
+                                         "-D_ENABLE_THRESHOLD_MODE=%s" % self.enable_threshold_mode,
                                          ])
 
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
@@ -159,18 +165,18 @@ class InDBCollector(object):
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_hop_latency >> i) & 0x01:
-                        event_data.append(u"flow_hop_latency\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d\\,sw_hop=%i value=%d%s" % (
-                                    event.vlan_id,
-                                    event.sw_ids[0],
-                                    event.e_port_ids[0],
-                                    event.sw_ids[i],
-                                    event.hop_latencies[i],
-                                    ' %d' % event.egr_times[i] if self.int_time else ''))
+                        event_data.append(u"latency\\,vlan\\=%d\\,sw\\=%i\\,port\\=%d\\,hop\\=%i value=%d%s" %
+                                          (event.vlan_id,
+                                           event.sw_ids[0],
+                                           event.e_port_ids[0],
+                                           event.sw_ids[i],
+                                           event.hop_latencies[i],
+                                           ' %d' % event.egr_times[i] if self.int_time else ''))
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_queue_occup >> i) & 0x01:
-                        event_data.append("queue_occupancy\\,sw_id\\=%d\\,eg_id\\=%d\\,queue_id\\=%d value=%d%s" %
+                        event_data.append(u"queue_occ\\,sw\\=%d\\,port\\=%d\\,queue\\=%d value=%d%s" %
                                           (event.sw_ids[i],
                                            event.e_port_ids[i],
                                            event.queue_ids[i],
@@ -181,4 +187,4 @@ class InDBCollector(object):
             self.event_data.extend(event_data)
             self.lock.release()
 
-        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=512)
+        self.bpf_collector["events"].open_perf_buffer(_process_event, page_cnt=1024)
