@@ -17,7 +17,17 @@ Make VID a 12-bit field instead of 16. EVCs with Vlan PCP might become an issue.
 
 Brainstorming:
 tail-call for extra functions and extra switches?
-test with metronome NICs
+test with netronome NICs
 
 FIX05:
 INT reports should be considered with a VLAN id. Line 218.
+
+Config file for setting process to CPU
+
+Export data to Kafka
+
+Organize db
+
+ProofOfTransit
+
+

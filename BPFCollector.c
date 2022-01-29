@@ -14,6 +14,8 @@
 #define FLOW_LATENCY _FLOW_LATENCY
 #define QUEUE_OCCUP _QUEUE_OCCUP
 #define TIME_GAP_W _TIME_GAP_W
+#define ENABLE_COUNTER_MODE _ENABLE_COUNTER_MODE
+#define ENABLE_THRESHOLD_MODE _ENABLE_THRESHOLD_MODE
 
 // __packet__ numbers
 #define ETHTYPE_IP 0x0800
@@ -145,7 +147,8 @@ struct queue_id_t {
 /* Queue Occupancy */
 struct queue_info_t {
     u16 occup;
-    u32 q_time;
+    u64 q_time;
+//    u32 q_time;
 };
 
 /* Identifying a network interface & VLAN */
@@ -190,8 +193,8 @@ struct flow_info_t {
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
     u32 hop_latencies[MAX_INT_HOP];
-    u16 queue_ids[MAX_INT_HOP];
-    u16 queue_occups[MAX_INT_HOP];
+    u8 queue_ids[MAX_INT_HOP];
+    u32 queue_occups[MAX_INT_HOP];
     u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
     u32 flow_latency;
@@ -238,6 +241,11 @@ int collector(struct xdp_md *ctx) {
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
         goto PASS;
 
+    // Consider an  VLAN (8021q)
+    struct vlan_tp *vlan;
+    if (unlikely(ntohs(eth->type) == ETHTYPE_VLAN))
+        CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*vlan), data_end);
+
     struct iphdr *ip;
     CURSOR_ADVANCE(ip, cursor, sizeof(*ip), data_end);
     if (unlikely(ip->protocol != IPPROTO_UDP))
@@ -258,7 +266,7 @@ int collector(struct xdp_md *ctx) {
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
 
-    struct vlan_tp *vlan;
+//    struct vlan_tp *vlan;
     CURSOR_ADVANCE(vlan, cursor, sizeof(*vlan), data_end);
 
     // Consider an extra VLAN (QinQ)
@@ -323,6 +331,7 @@ int collector(struct xdp_md *ctx) {
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.queue_ids[i] = (ntohl(*INT_data) >> 8) & 0xff;
+//        flow_info.queue_ids[i] = 0;
         flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffffff;
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -358,6 +367,8 @@ int collector(struct xdp_md *ctx) {
     flow_id.vlan_id = flow_info.vlan_id;
     flow_id.last_sw_id = flow_info.sw_ids[0];  // Last switch
     flow_id.last_egr_id = flow_info.e_port_ids[0];
+
+#if ENABLE_THRESHOLD_MODE == 1
 
     struct flow_info_t *flow_info_p = tb_flow.lookup(&flow_id);
     if (unlikely(!flow_info_p)) {
@@ -431,75 +442,6 @@ int collector(struct xdp_md *ctx) {
     if (is_update)
         tb_flow.update(&flow_id, &flow_info);
 
-
-    /*****************  Egress info and flow bandwidth *****************/
-
-    struct egr_tx_info_t *egr_info_p;
-    struct egr_tx_info_t egr_info;
-    struct egress_eg_q_vlan_id_t egr_id = {};
-    struct egress_queue_util_id_t egr_q_id = {};
-    struct egress_util_id_t egr_int_id = {};
-    u64 packet_len = 18 + ntohs(in_ip->tot_len);
-
-    _num_INT_hop = num_INT_hop;
-    #pragma unroll
-    for (u8 i = 0; i < MAX_INT_HOP; i++) {
-
-        // Full details: interface + queue + vlan
-        egr_id.sw_id  = flow_info.sw_ids[i];
-        egr_id.p_id = flow_info.e_port_ids[i];
-        egr_id.q_id = flow_info.queue_ids[i];
-        egr_id.v_id = flow_info.vlan_id;
-
-        egr_info_p = tb_egr_vlan_util.lookup(&egr_id);
-        if(unlikely(!egr_info_p)) {
-            egr_info.octets = 0;
-            egr_info.packets = 0;
-        }
-        else {
-            egr_info.octets = packet_len + egr_info_p->octets;
-            egr_info.packets = 1 + egr_info_p->packets;
-        }
-        tb_egr_vlan_util.update(&egr_id, &egr_info);
-
-        // interface + queue details
-        egr_q_id.sw_id  = flow_info.sw_ids[i];
-        egr_q_id.p_id = flow_info.e_port_ids[i];
-        egr_q_id.q_id = flow_info.queue_ids[i];
-
-        egr_info_p = tb_egr_queue_util.lookup(&egr_q_id);
-        if(unlikely(!egr_info_p)) {
-            egr_info.octets = 0;
-            egr_info.packets = 0;
-        }
-        else {
-            egr_info.octets = packet_len + egr_info_p->octets;
-            egr_info.packets = 1 + egr_info_p->packets;
-        }
-        tb_egr_queue_util.update(&egr_id, &egr_info);
-
-        // interface details
-        egr_int_id.sw_id  = flow_info.sw_ids[i];
-        egr_int_id.p_id = flow_info.e_port_ids[i];
-
-        egr_info_p = tb_egr_interface_util.lookup(&egr_int_id);
-        if(unlikely(!egr_info_p)) {
-            egr_info.octets = 0;
-            egr_info.packets = 0;
-        }
-        else {
-            egr_info.octets = packet_len + egr_info_p->octets;
-            egr_info.packets = 1 + egr_info_p->packets;
-        }
-        tb_egr_interface_util.update(&egr_id, &egr_info);
-
-        if (i < MAX_INT_HOP - 1) {
-            _num_INT_hop--;
-            if (_num_INT_hop <= 0)
-                break;
-        }
-    }
-
     /*****************  Queue info  *****************/
 
     struct queue_info_t *queue_info_p;
@@ -516,7 +458,8 @@ int collector(struct xdp_md *ctx) {
             queue_id.q_id = flow_info.queue_ids[i];
 
             queue_info.occup = flow_info.queue_occups[i];
-            queue_info.q_time = flow_info.egr_times[i];
+//            queue_info.q_time = flow_info.egr_times[i];
+            queue_info.q_time = flow_info.flow_sink_time;
 
             is_update = 0;
 
@@ -527,8 +470,9 @@ int collector(struct xdp_md *ctx) {
                 is_update = 1;
 
             } else {
-
-                if (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP)) {
+//                if (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP)) {
+                if ((queue_info_p->q_time + TIME_GAP_W < flow_info.flow_sink_time)
+                            | (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP))) {
                     flow_info.is_queue_occup |= 1 << i;
                     is_update = 1;
                 }
@@ -545,8 +489,87 @@ int collector(struct xdp_md *ctx) {
 
         }
     }
+
+#endif
+
+    /*****************  Egress info and flow bandwidth *****************/
+
+#if ENABLE_COUNTER_MODE == 1
+
+    struct egr_tx_info_t *egr_info_p_v;
+    struct egr_tx_info_t *egr_info_p_q;
+    struct egr_tx_info_t *egr_info_p_i;
+    struct egr_tx_info_t egr_info_v;
+    struct egr_tx_info_t egr_info_q;
+    struct egr_tx_info_t egr_info_i;
+    struct egress_eg_q_vlan_id_t egr_id = {};
+    struct egress_queue_util_id_t egr_q_id = {};
+    struct egress_util_id_t egr_int_id = {};
+    u64 packet_len = 18 + ntohs(in_ip->tot_len);
+
+    _num_INT_hop = num_INT_hop;
+    #pragma unroll
+    for (u8 i = 0; i < MAX_INT_HOP; i++) {
+
+        // Full details: interface + queue + vlan
+        egr_id.sw_id  = flow_info.sw_ids[i];
+        egr_id.p_id = flow_info.e_port_ids[i];
+        egr_id.q_id = flow_info.queue_ids[i];
+        egr_id.v_id = flow_info.vlan_id;
+
+        egr_info_p_v = tb_egr_vlan_util.lookup(&egr_id);
+        if(unlikely(!egr_info_p_v)) {
+            egr_info_v.octets = 0;
+            egr_info_v.packets = 0;
+        }
+        else {
+            egr_info_v.octets = packet_len + egr_info_p_v->octets;
+            egr_info_v.packets = 1 + egr_info_p_v->packets;
+        }
+        tb_egr_vlan_util.update(&egr_id, &egr_info_v);
+
+        // interface + queue details
+        egr_q_id.sw_id  = flow_info.sw_ids[i];
+        egr_q_id.p_id = flow_info.e_port_ids[i];
+        egr_q_id.q_id = flow_info.queue_ids[i];
+
+        egr_info_p_q = tb_egr_queue_util.lookup(&egr_q_id);
+        if(unlikely(!egr_info_p_q)) {
+            egr_info_q.octets = 0;
+            egr_info_q.packets = 0;
+        }
+        else {
+            egr_info_q.octets = packet_len + egr_info_p_q->octets;
+            egr_info_q.packets = 1 + egr_info_p_q->packets;
+        }
+        tb_egr_queue_util.update(&egr_q_id, &egr_info_q);
+
+        // interface details
+        egr_int_id.sw_id  = flow_info.sw_ids[i];
+        egr_int_id.p_id = flow_info.e_port_ids[i];
+
+        egr_info_p_i = tb_egr_interface_util.lookup(&egr_int_id);
+        if(unlikely(!egr_info_p_i)) {
+            egr_info_i.octets = 0;
+            egr_info_i.packets = 0;
+        }
+        else {
+            egr_info_i.octets = packet_len + egr_info_p_i->octets;
+            egr_info_i.packets = 1 + egr_info_p_i->packets;
+        }
+        tb_egr_interface_util.update(&egr_int_id, &egr_info_i);
+
+        if (i < MAX_INT_HOP - 1) {
+            _num_INT_hop--;
+            if (_num_INT_hop <= 0)
+                break;
+        }
+    }
+
+#endif
+
     // debug:
-    //flow_info.is_flow = 1;
+    // flow_info.is_flow = 1;
     // submit event info to user space
     if (unlikely(flow_info.is_n_flow |
                  flow_info.is_hop_latency |
