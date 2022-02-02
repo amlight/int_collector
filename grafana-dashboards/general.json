@@ -1129,12 +1129,57 @@
               "type": "fill"
             }
           ],
+          "hide": false,
           "measurement": "telemetry_packet_counter,type=0",
           "orderByTime": "ASC",
           "policy": "default",
           "query": "SELECT derivative(max(\"value\"),1s) FROM \"int_reports,type=2\" WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "B",
+          "resultFormat": "time_series",
+          "select": [
+            [
+              {
+                "params": [
+                  "value"
+                ],
+                "type": "field"
+              },
+              {
+                "params": [],
+                "type": "mean"
+              }
+            ]
+          ],
+          "tags": []
+        },
+        {
+          "alias": "Total Number of Alerts Generated",
+          "datasource": {
+            "type": "influxdb",
+            "uid": "CDCTEfb7k"
+          },
+          "groupBy": [
+            {
+              "params": [
+                "$__interval"
+              ],
+              "type": "time"
+            },
+            {
+              "params": [
+                "null"
+              ],
+              "type": "fill"
+            }
+          ],
+          "hide": false,
+          "measurement": "telemetry_packet_counter,type=0",
+          "orderByTime": "ASC",
+          "policy": "default",
+          "query": "SELECT derivative(max(\"value\"),1s) FROM \"int_reports,type=3\" WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "rawQuery": true,
+          "refId": "C",
           "resultFormat": "time_series",
           "select": [
             [
@@ -1185,7 +1230,7 @@
       }
     }
   ],
-  "refresh": "",
+  "refresh": "10s",
   "schemaVersion": 34,
   "style": "dark",
   "tags": [],
@@ -1193,17 +1238,14 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-30s",
     "to": "now"
   },
   "timepicker": {
     "hidden": false,
     "nowDelay": "",
     "refresh_intervals": [
-      "200ms",
-      "500ms",
       "1s",
-      "2s",
       "5s",
       "10s",
       "30s",
@@ -1215,6 +1257,6 @@
   "timezone": "",
   "title": "AmLight-INT-Dev",
   "uid": "6If5chtMk",
-  "version": 10,
+  "version": 18,
   "weekStart": ""
 }
