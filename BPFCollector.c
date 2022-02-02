@@ -37,6 +37,8 @@
         if(unlikely(_cursor > _data_end)) return XDP_DROP; })
 
 #define ABS(a, b) ((a>b)? (a-b):(b-a))
+
+
 //--------------------------------------------------------------------
 
 // Protocols
@@ -87,13 +89,13 @@ struct telemetry_report_v10_t {
 /* INT shim */
 struct INT_shim_v10_t {
     u8 type;
-    u8 shimRsvd1;
+    u8 rsvd_1;
     u8 length;
 #if defined(__BIG_ENDIAN_BITFIELD)
     u8  DSCP:6,
-        r:2;
+        rsvd_2:2;
 #elif defined(__LITTLE_ENDIAN_BITFIELD)
-    u8  r:2,
+    u8  rsvd_2:2,
         DSCP:6;
 #else
 #error  "Please fix <asm/byteorder.h>"
@@ -188,12 +190,11 @@ struct flow_info_t {
     u16 vlan_id;
     u8 num_INT_hop;
     u8 hop_negative; // In case there is an error
-
     u32 sw_ids[MAX_INT_HOP];
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
     u32 hop_latencies[MAX_INT_HOP];
-    u8 queue_ids[MAX_INT_HOP];
+    u16 queue_ids[MAX_INT_HOP];
     u32 queue_occups[MAX_INT_HOP];
     u32 ingr_times[MAX_INT_HOP];
     u32 egr_times[MAX_INT_HOP];
@@ -216,6 +217,7 @@ BPF_TABLE("lru_hash", struct egress_util_id_t, struct egr_tx_info_t, tb_egr_inte
 
 BPF_HISTOGRAM(counter_all, u64);
 BPF_HISTOGRAM(counter_int, u64);
+BPF_HISTOGRAM(counter_error, u64);
 
 //--------------------------------------------------------------------
 
@@ -232,8 +234,7 @@ int collector(struct xdp_md *ctx) {
     void* cursor = (void*)(long)ctx->data;
 
     /*
-        Parse outer: Ether->IP->UDP->TelemetryReport.
-        TODO: add VLAN
+        Parse outer: Ether->[VLAN]->IP->UDP->TelemetryReport.
     */
 
     struct eth_tp *eth;
@@ -265,8 +266,6 @@ int collector(struct xdp_md *ctx) {
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
-
-//    struct vlan_tp *vlan;
     CURSOR_ADVANCE(vlan, cursor, sizeof(*vlan), data_end);
 
     // Consider an extra VLAN (QinQ)
@@ -283,14 +282,18 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_shim_v10_t *INT_shim;
     CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
+    if (INT_shim->type != 1) goto ERROR;
+    if (INT_shim->rsvd_1 != 0) goto ERROR;
+    if (INT_shim->length == 0) goto ERROR;
+    if (INT_shim->rsvd_2 != 0) goto ERROR;
 
     struct INT_md_fix_v10_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
-
-//     Disabling this temporarily since we are increasing the number of metadata
-//    if (unlikely(INT_shim->length != 9))
-//        // TODO: Identify which packets have length > 9 since there is only one switch
-//        goto PASS;
+        if (INT_md_fix->ver != 1) goto ERROR;
+    if (INT_md_fix->rep != 0) goto ERROR;
+    if (INT_md_fix->c != 0) goto ERROR;
+    if (INT_md_fix->hopMlen != 6) goto ERROR;
+    if (INT_md_fix->remainHopCnt > 10) goto ERROR;
 
     /* ****************  Parse INT data **************** */
 
@@ -305,7 +308,12 @@ int collector(struct xdp_md *ctx) {
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
     // Assume that sw_id is always presented.
-    if ((INT_ins >> 15) & 0x01 != 1) return XDP_DROP;
+    if ((INT_ins >> 15) & 0x01 != 1) goto ERROR;
+    if ((INT_ins >> 14) & 0x01 != 1) goto ERROR;
+    if ((INT_ins >> 13) & 0x01 != 1) goto ERROR;
+    if ((INT_ins >> 12) & 0x01 != 1) goto ERROR;
+    if ((INT_ins >> 11) & 0x01 != 1) goto ERROR;
+    if ((INT_ins >> 10) & 0x01 != 1) goto ERROR;
 
     u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x1;
     u8 is_hop_latencies  = (INT_ins >> 13) & 0x1;
@@ -331,8 +339,8 @@ int collector(struct xdp_md *ctx) {
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.queue_ids[i] = (ntohl(*INT_data) >> 8) & 0xff;
-//        flow_info.queue_ids[i] = 0;
         flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffffff;
+        if ((ntohl(*INT_data) >> 8) & 0xff > 7) goto ERROR;
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.ingr_times[i] = ntohl(*INT_data);
@@ -586,4 +594,9 @@ DROP:
 
 PASS:
     return XDP_PASS;
+
+ERROR:
+    value = 3;
+    counter_error.increment(value);
+    return XDP_DROP;
 }

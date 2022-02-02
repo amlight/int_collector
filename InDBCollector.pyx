@@ -16,7 +16,7 @@ cdef struct Event:
     unsigned short in_port_ids[__MAX_INT_HOP]
     unsigned short e_port_ids[__MAX_INT_HOP]
     unsigned int   hop_latencies[__MAX_INT_HOP]
-    unsigned char  queue_ids[__MAX_INT_HOP]
+    unsigned short  queue_ids[__MAX_INT_HOP]
     unsigned int   queue_occups[__MAX_INT_HOP]
     unsigned int   ingr_times[__MAX_INT_HOP]
     unsigned int   egr_times[__MAX_INT_HOP]
@@ -33,7 +33,7 @@ class InDBCollector(object):
 
     def __init__(self,
                  int_dst_port,
-                 debug_mode,
+                 debug_int,
                  host,
                  database,
                  flags,
@@ -43,7 +43,8 @@ class InDBCollector(object):
                  max_hops,
                  flow_keepalive,
                  enable_counter_mode,
-                 enable_threshold_mode):
+                 enable_threshold_mode,
+                 test_int_metadata):
 
         super(InDBCollector, self).__init__()
 
@@ -55,6 +56,7 @@ class InDBCollector(object):
         self.flow_keepalive = flow_keepalive
         self.enable_counter_mode = enable_counter_mode
         self.enable_threshold_mode = enable_threshold_mode
+        self.test_int_metadata = test_int_metadata
 
         self.int_time = False
 
@@ -71,11 +73,12 @@ class InDBCollector(object):
                                          "-D_TIME_GAP_W=%s" % self.flow_keepalive,
                                          "-D_ENABLE_COUNTER_MODE=%s" % self.enable_counter_mode,
                                          "-D_ENABLE_THRESHOLD_MODE=%s" % self.enable_threshold_mode,
+                                         "-D_EVALUATE_INT_ONLY=%s" % self.test_int_metadata
                                          ])
 
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
-        # get all the info table for the future.
+        # get all the info table
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr_vlan_util")
@@ -84,13 +87,14 @@ class InDBCollector(object):
 
         self.packet_counter_all = self.bpf_collector.get_table("counter_all")
         self.packet_counter_int = self.bpf_collector.get_table("counter_int")
+        self.packet_counter_errors = self.bpf_collector.get_table("counter_error")
 
         self.lock = threading.Lock()
         self.event_data = []
 
         self.client = InfluxDBClient(host=host, database=database)
 
-        self.debug_mode = debug_mode
+        self.debug_mode = debug_int
 
         self.flags = 0 | (1 << 3) if flags else 0
 

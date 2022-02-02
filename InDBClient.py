@@ -16,7 +16,7 @@ def parse_params():
     parser.add_argument("ifaces", nargs='+',
                         help="List of ifaces to receive INT reports")
 
-    parser.add_argument("-i", "--int_port", default=5900, type=int,
+    parser.add_argument("-i", "--int-port", default=5900, type=int,
                         help="Destination port of INT Telemetry reports")
 
     parser.add_argument("-H", "--host", default="localhost",
@@ -25,10 +25,10 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    parser.add_argument("-P", "--event_period", default=0.5, type=float,
+    parser.add_argument("-P", "--event-period", default=0.5, type=float,
                         help="Interval in seconds to push event data. Default: 0.5 seconds.")
 
-    parser.add_argument("-d", "--debug_mode", default=0, type=int,
+    parser.add_argument("-d", "--debug-mode", default=0, type=int,
                         help="Set to 1 to print event")
 
     parser.add_argument("-n", "--new-measurements", default=0, type=int,
@@ -52,7 +52,7 @@ def parse_params():
     parser.add_argument("--max-number-int-hops", default=10, type=int,
                         help="Max number of INT metadata to process")
 
-    parser.add_argument("--flow_keepalive", default=2000000000, type=int,
+    parser.add_argument("--flow-keepalive", default=2000000000, type=int,
                         help="Interval in ns to report flows even if there are no changes")
 
     parser.add_argument("--run-counter-mode-only", default=0, type=int,
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     enable_counter = 0 if args.run_threshold_mode_only else 1
 
     collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
-                                            debug_mode=args.debug_mode,
+                                            debug_int=args.debug_mode,
                                             host=args.host,
                                             database=args.database,
                                             flags=args.xdp_mode,
@@ -92,9 +92,10 @@ if __name__ == "__main__":
     if args.database not in collector.client.get_list_database():
         collector.client.create_database(args.database)
 
+    # If database is needs to be recreated
     if args.new_measurements:
-        for db in collector.client.get_list_database():
-            collector.client.drop_database(db["name"])
+        if args.database in collector.client.get_list_database():
+            collector.client.drop_database(args.database)
         collector.client.create_database(args.database)
 
     push_stop_flag = threading.Event()
@@ -121,9 +122,11 @@ if __name__ == "__main__":
     event_push.start()
 
     # Collecting and exporting data from tables instead of events.
+    gather_stop_flag = threading.Event()
+
     def _gather_counters():
 
-        while not push_stop_flag.is_set():
+        while not gather_stop_flag.is_set():
 
             time.sleep(args.interface_util_interval)
             event_data = []
@@ -132,6 +135,9 @@ if __name__ == "__main__":
                 event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in sorted(collector.packet_counter_int.items()):
+                event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
+
+            for k, v in sorted(collector.packet_counter_errors.items()):
                 event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in collector.tb_egr.items():
@@ -196,6 +202,7 @@ if __name__ == "__main__":
 
     finally:
         push_stop_flag.set()
+        gather_stop_flag.set()
         event_push.join()
         gather_counters.join()
 
