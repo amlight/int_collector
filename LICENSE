@@ -633,7 +633,8 @@ the "copyright" line and a pointer to where the full notice is found.
 
     This code is the AmLight INT Collector developed to collect INT reports
     exported by AmLight SDN switches.
-    Copyright (C) 2022  AmLight SDN Team
+    Copyright (c) [2018] [Nguyen Van Tu],
+    Copyright (c) [2022] [AmLight SDN Team]
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
