@@ -1,14 +1,31 @@
-#define KBUILD_MODNAME "xdp_collector"
+/*
+ * This file is part of the INT Collector distribution (https://github.com/amlight/int_collector).
+ *  Copyright (c) [2018] [Nguyen Van Tu],
+ *  Copyright (c) [2022] [AmLight SDN Team]
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, version 3.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#define KBUILD_MODNAME "int_collector"
 #include <linux/in.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
 #include <linux/if_vlan.h>
 #include <linux/ip.h>
-#include <linux/ipv6.h>  // <-- if removed, UDP errors. Find out why
+#include <linux/ipv6.h>
 
 // User Variables
 #define INT_DST_PORT _INT_DST_PORT
-//#define MAX_INT_HOP _MAX_INT_HOP  // Noviflow only supports reports with 10 metadata
 #define MAX_INT_HOP 10  // Noviflow only supports reports with 10 metadata
 #define HOP_LATENCY _HOP_LATENCY
 #define FLOW_LATENCY _FLOW_LATENCY
@@ -103,7 +120,7 @@ struct INT_shim_v10_t {
 } __attribute__((packed));
 
 /* INT metadata header */
-struct INT_md_fix_v10_t {
+struct INT_md_hdr_v10_t {
 #if defined(__BIG_ENDIAN_BITFIELD)
     u8  ver:4,
         rep:2,
@@ -182,7 +199,6 @@ struct egr_tx_info_t {
 
 // Events
 
-// TODO: flow ID is just vlan_id. Extend it to be <last_sw, eg_id, vlan>
 // TODO: Change to u16 is_hop_latency:12 since we plan to use 10 switches (12 bits)
 // TODO: Change to u16 is_queue_occup:12 since we plan to use 10 switches (12 bits)
 struct flow_info_t {
@@ -242,7 +258,7 @@ int collector(struct xdp_md *ctx) {
     if (unlikely(ntohs(eth->type) != ETHTYPE_IP))
         goto PASS;
 
-    // Consider an  VLAN (8021q)
+    // Consider a VLAN (8021q)
     struct vlan_tp *vlan;
     if (unlikely(ntohs(eth->type) == ETHTYPE_VLAN))
         CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*vlan), data_end);
@@ -261,7 +277,7 @@ int collector(struct xdp_md *ctx) {
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
     /*
-        Parse Inner: Ether->Vlan->IP->UDP/TCP->INT.
+        Parse Inner: Ether->Vlan->[Vlan]->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
     */
 
@@ -282,17 +298,19 @@ int collector(struct xdp_md *ctx) {
 
     struct INT_shim_v10_t *INT_shim;
     CURSOR_ADVANCE(INT_shim, cursor, sizeof(*INT_shim), data_end);
-    if (INT_shim->type != 1) goto ERROR;
+    // Validation against damaged reports
+    if (INT_shim->type != 1)   goto ERROR;
     if (INT_shim->rsvd_1 != 0) goto ERROR;
     if (INT_shim->length == 0) goto ERROR;
     if (INT_shim->rsvd_2 != 0) goto ERROR;
 
-    struct INT_md_fix_v10_t *INT_md_fix;
+    struct INT_md_hdr_v10_t *INT_md_fix;
     CURSOR_ADVANCE(INT_md_fix, cursor, sizeof(*INT_md_fix), data_end);
-        if (INT_md_fix->ver != 1) goto ERROR;
-    if (INT_md_fix->rep != 0) goto ERROR;
-    if (INT_md_fix->c != 0) goto ERROR;
-    if (INT_md_fix->hopMlen != 6) goto ERROR;
+    // Validation against damaged reports
+    if (INT_md_fix->ver != 1)          goto ERROR;
+    if (INT_md_fix->rep != 0)          goto ERROR;
+    if (INT_md_fix->c != 0)            goto ERROR;
+    if (INT_md_fix->hopMlen != 6)      goto ERROR;
     if (INT_md_fix->remainHopCnt > 10) goto ERROR;
 
     /* ****************  Parse INT data **************** */
@@ -307,20 +325,20 @@ int collector(struct xdp_md *ctx) {
     };
 
     u16 INT_ins = ntohs(INT_md_fix->ins);
-    // Assume that sw_id is always presented.
+    // Validation against damaged reports
     if ((INT_ins >> 15) & 0x01 != 1) goto ERROR;
     if ((INT_ins >> 14) & 0x01 != 1) goto ERROR;
     if ((INT_ins >> 13) & 0x01 != 1) goto ERROR;
     if ((INT_ins >> 12) & 0x01 != 1) goto ERROR;
     if ((INT_ins >> 11) & 0x01 != 1) goto ERROR;
     if ((INT_ins >> 10) & 0x01 != 1) goto ERROR;
+    /* NoviFlow doesn't support other instructions */
 
     u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x1;
     u8 is_hop_latencies  = (INT_ins >> 13) & 0x1;
     u8 is_queue_occups 	 = (INT_ins >> 12) & 0x1;
     u8 is_ingr_times 	 = (INT_ins >> 11) & 0x1;
     u8 is_egr_times 	 = (INT_ins >> 10) & 0x1;
-    /* NoviFlow doesn't support other instructions */
 
     u32* INT_data;
 
@@ -340,6 +358,7 @@ int collector(struct xdp_md *ctx) {
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.queue_ids[i] = (ntohl(*INT_data) >> 8) & 0xff;
         flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffffff;
+        // Validation against damaged reports
         if ((ntohl(*INT_data) >> 8) & 0xff > 7) goto ERROR;
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
@@ -354,6 +373,7 @@ int collector(struct xdp_md *ctx) {
             flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         else{
+            // Validation against damaged reports
             flow_info.hop_negative = 1;
             flow_info.hop_latencies[i] = 400;
         }
@@ -373,7 +393,7 @@ int collector(struct xdp_md *ctx) {
     struct flow_id_t flow_id = {};
 
     flow_id.vlan_id = flow_info.vlan_id;
-    flow_id.last_sw_id = flow_info.sw_ids[0];  // Last switch
+    flow_id.last_sw_id = flow_info.sw_ids[0];
     flow_id.last_egr_id = flow_info.e_port_ids[0];
 
 #if ENABLE_THRESHOLD_MODE == 1
@@ -392,9 +412,9 @@ int collector(struct xdp_md *ctx) {
                 case 4: flow_info.is_hop_latency = 0x0f; break;
                 case 5: flow_info.is_hop_latency = 0x1f; break;
                 case 6: flow_info.is_hop_latency = 0x3f; break;
-                // FIX01: MAX 6 for now
-                // case 7: flow_info.is_hop_latency = 0x7f; break;
-                // case 8: flow_info.is_hop_latency = 0xff; break;
+                case 7: flow_info.is_hop_latency = 0x7f; break;
+                case 8: flow_info.is_hop_latency = 0xff; break;
+                 // FIX01: MAX 8 for now
                 // case 9: flow_info.is_hop_latency = 0x1ff; break;
                 // case 10: flow_info.is_hop_latency = 0x3ff; break;
                 default: break;
