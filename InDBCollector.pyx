@@ -62,8 +62,7 @@ class InDBCollector(object):
                  max_hops,
                  flow_keepalive,
                  enable_counter_mode,
-                 enable_threshold_mode,
-                 test_int_metadata):
+                 enable_threshold_mode):
 
         super(InDBCollector, self).__init__()
 
@@ -75,7 +74,6 @@ class InDBCollector(object):
         self.flow_keepalive = flow_keepalive
         self.enable_counter_mode = enable_counter_mode
         self.enable_threshold_mode = enable_threshold_mode
-        self.test_int_metadata = test_int_metadata
 
         self.int_time = False
 
@@ -91,8 +89,7 @@ class InDBCollector(object):
                                          "-D_QUEUE_OCCUP=%s" % self.queue_occ,
                                          "-D_TIME_GAP_W=%s" % self.flow_keepalive,
                                          "-D_ENABLE_COUNTER_MODE=%s" % self.enable_counter_mode,
-                                         "-D_ENABLE_THRESHOLD_MODE=%s" % self.enable_threshold_mode,
-                                         "-D_EVALUATE_INT_ONLY=%s" % self.test_int_metadata
+                                         "-D_ENABLE_THRESHOLD_MODE=%s" % self.enable_threshold_mode
                                          ])
 
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
