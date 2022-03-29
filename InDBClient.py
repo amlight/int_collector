@@ -17,8 +17,6 @@
 #
 
 
-from __future__ import print_function
-
 import os
 import threading
 import time
@@ -44,14 +42,13 @@ if __name__ == "__main__":
                                             hop_latency=args.hop_latency,
                                             flow_latency=args.flow_latency,
                                             queue_occ=args.queue_occ,
-                                            max_hops=args.max_number_int_hops,
                                             flow_keepalive=args.flow_keepalive,
                                             enable_counter_mode=enable_counter,
                                             enable_threshold_mode=enable_threshold)
 
-    for iface in args.ifaces:
-        _ = os.system("ifconfig %s promisc" % iface)
-        collector.attach_iface(iface)
+    # Attach XDP code to interface
+    _ = os.system("ifconfig %s promisc" % args.interface)
+    collector.attach_iface(args.interface)
 
     # Test if database is not found,create one
     if args.database not in collector.client.get_list_database():
@@ -172,6 +169,6 @@ if __name__ == "__main__":
         gather_counters.join()
 
         collector.detach_all_iface()
-        for iface in args.ifaces:
-            _ = os.system("ifconfig %s -promisc" % iface)
+
+        _ = os.system("ifconfig %s -promisc" % args.interface)
         print("Done")

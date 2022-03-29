@@ -23,10 +23,10 @@ import argparse
 def parse_params():
     parser = argparse.ArgumentParser(description='InfluxBD INTCollector client.')
 
-    parser.add_argument("ifaces", nargs='+',
-                        help="List of ifaces to receive INT reports")
+    parser.add_argument("-i", "--interface", default="eth0",
+                        help="Interface to receive INT reports")
 
-    parser.add_argument("-i", "--int-port", default=5900, type=int,
+    parser.add_argument("-p", "--int-port", default=5900, type=int,
                         help="Destination port of INT Telemetry reports")
 
     parser.add_argument("-H", "--host", default="localhost",
@@ -58,9 +58,6 @@ def parse_params():
 
     parser.add_argument("--interface-util-interval", default=0.5, type=int,
                         help="Interval in seconds between recording interface egress utilization")
-
-    parser.add_argument("--max-number-int-hops", default=10, type=int,
-                        help="Max number of INT metadata to process")
 
     parser.add_argument("--flow-keepalive", default=2000000000, type=int,
                         help="Interval in ns to report flows even if there are no changes")

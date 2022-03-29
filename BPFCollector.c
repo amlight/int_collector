@@ -24,9 +24,10 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 
+#define MAX_INT_HOP 10  // Noviflow only supports reports with 10 metadata
+
 // User Variables
 #define INT_DST_PORT _INT_DST_PORT
-#define MAX_INT_HOP 10  // Noviflow only supports reports with 10 metadata
 #define HOP_LATENCY _HOP_LATENCY
 #define FLOW_LATENCY _FLOW_LATENCY
 #define QUEUE_OCCUP _QUEUE_OCCUP

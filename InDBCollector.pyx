@@ -59,14 +59,12 @@ class InDBCollector(object):
                  hop_latency,
                  flow_latency,
                  queue_occ,
-                 max_hops,
                  flow_keepalive,
                  enable_counter_mode,
                  enable_threshold_mode):
 
         super(InDBCollector, self).__init__()
 
-        self.max_int_hops = max_hops
         self.int_dst_port = int_dst_port
         self.hop_latency = hop_latency
         self.flow_latency = flow_latency
@@ -82,7 +80,6 @@ class InDBCollector(object):
         #load eBPF program
         self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
                                  cflags=["-w",
-                                         "-D_MAX_INT_HOP=%s" % self.max_int_hops,
                                          "-D_INT_DST_PORT=%s" % self.int_dst_port,
                                          "-D_HOP_LATENCY=%s" % self.hop_latency,
                                          "-D_FLOW_LATENCY=%s" % self.flow_latency,
@@ -94,7 +91,7 @@ class InDBCollector(object):
 
         self.fn_collector = self.bpf_collector.load_func("collector", BPF.XDP)
 
-        # get all the info table
+        # Table maps
         self.tb_flow  = self.bpf_collector.get_table("tb_flow")
         self.tb_queue = self.bpf_collector.get_table("tb_queue")
         self.tb_egr   = self.bpf_collector.get_table("tb_egr_vlan_util")
