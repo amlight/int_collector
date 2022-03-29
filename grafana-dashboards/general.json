@@ -24,14 +24,6 @@
   "id": 2,
   "links": [
     {
-      "icon": "external link",
-      "tags": [],
-      "title": "CPU Usage",
-      "tooltip": "",
-      "type": "link",
-      "url": "http://190.103.186.103:3000/d/I-1EiQuGz/cpu-utilization-details-cores?orgId=1&refresh=10s"
-    },
-    {
       "asDropdown": false,
       "icon": "external link",
       "includeVars": false,
@@ -47,45 +39,77 @@
   "liveNow": false,
   "panels": [
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "description": "",
-      "fill": 1,
-      "fillGradient": 0,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bps"
+        },
+        "overrides": []
+      },
       "gridPos": {
         "h": 6,
         "w": 24,
         "x": 0,
         "y": 0
       },
-      "hiddenSeries": false,
       "id": 21,
-      "legend": {
-        "avg": false,
-        "current": false,
-        "max": false,
-        "min": false,
-        "show": true,
-        "total": false,
-        "values": false
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "null",
       "options": {
-        "alertThreshold": true
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
-      "percentage": false,
       "pluginVersion": "8.3.4",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
           "alias": "",
@@ -111,7 +135,7 @@
           "measurement": "port_tx_utilization_octets,sw_id=4217755253,eg_id=0,queue_id=0",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs,sw=.*,port=.*,queue=.*,vlan=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs,sw=4217755253,port=.*,queue=.*,vlan=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -132,14 +156,7 @@
           "tags": []
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
-      "title": "Total Traffic at AmLight",
-      "tooltip": {
-        "shared": true,
-        "sort": 0,
-        "value_type": "individual"
-      },
+      "title": "Total Traffic via MIA-MI1-SW10",
       "transformations": [
         {
           "id": "calculateField",
@@ -153,37 +170,60 @@
           }
         }
       ],
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "bps",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "short",
-          "logBase": 1,
-          "show": true
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
-      "aliasColors": {},
-      "bars": false,
-      "dashLength": 10,
-      "dashes": false,
       "description": "",
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "bps"
+        },
         "overrides": [
           {
             "matcher": {
@@ -199,47 +239,29 @@
           }
         ]
       },
-      "fill": 2,
-      "fillGradient": 1,
       "gridPos": {
         "h": 8,
         "w": 24,
         "x": 0,
         "y": 6
       },
-      "hiddenSeries": false,
       "id": 15,
-      "legend": {
-        "alignAsTable": true,
-        "avg": true,
-        "current": false,
-        "hideEmpty": false,
-        "hideZero": false,
-        "max": true,
-        "min": false,
-        "rightSide": true,
-        "show": true,
-        "sideWidth": 500,
-        "sort": "max",
-        "sortDesc": true,
-        "total": false,
-        "values": true
-      },
-      "lines": true,
-      "linewidth": 1,
-      "nullPointMode": "connected",
       "options": {
-        "alertThreshold": false
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single"
+        }
       },
-      "percentage": false,
       "pluginVersion": "8.3.4",
-      "pointradius": 2,
-      "points": false,
-      "renderer": "flot",
-      "seriesOverrides": [],
-      "spaceLength": 10,
-      "stack": false,
-      "steppedLine": false,
       "targets": [
         {
           "alias": "$m",
@@ -265,7 +287,7 @@
           "measurement": "port_tx_utilization_octets,sw_id=4217755253,eg_id=0,queue_id=0",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs,sw=.*,port=.*,queue=.*,vlan=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs,sw=4217755253,port=.*,queue=0,vlan=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -286,39 +308,8 @@
           "tags": []
         }
       ],
-      "thresholds": [],
-      "timeRegions": [],
       "title": "Per-Flow Egress Utilization - Bits per Second",
-      "tooltip": {
-        "shared": true,
-        "sort": 1,
-        "value_type": "cumulative"
-      },
-      "type": "graph",
-      "xaxis": {
-        "mode": "time",
-        "show": true,
-        "values": []
-      },
-      "yaxes": [
-        {
-          "format": "bps",
-          "label": "",
-          "logBase": 1,
-          "min": "0",
-          "show": true
-        },
-        {
-          "format": "pps",
-          "label": "Packets",
-          "logBase": 1,
-          "min": "0",
-          "show": false
-        }
-      ],
-      "yaxis": {
-        "align": false
-      }
+      "type": "timeseries"
     },
     {
       "aliasColors": {},
@@ -392,7 +383,7 @@
           "measurement": "port_tx_utilization_octets,sw_id=4217755253,eg_id=0,queue_id=0",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs_queue,sw=.*,port=.*,queue=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs_queue,sw=4217755253,port=.*,queue=0/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "C",
           "resultFormat": "time_series",
@@ -436,7 +427,7 @@
           "measurement": "port_tx_utilization_octets,sw_id=4217755253,eg_id=0,queue_id=0",
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs_int,sw=.*,port=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "query": "SELECT  derivative(max(\"value\"),1s)*8 FROM /tx_octs_int,sw=4217755253,port=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -558,7 +549,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT  derivative(max(\"value\"),1s) FROM /tx_pkts,sw=.*,port=.*,queue=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
+          "query": "SELECT  derivative(max(\"value\"),1s) FROM /tx_pkts,sw=4217755253,port=.*,queue=0/ WHERE $timeFilter GROUP BY time($__interval) fill(null)",
           "rawQuery": true,
           "refId": "A",
           "resultFormat": "time_series",
@@ -680,7 +671,7 @@
           ],
           "orderByTime": "ASC",
           "policy": "default",
-          "query": "SELECT max(\"value\") * 80 FROM /queue_occ,sw=.*,port=.*,queue=.*/ WHERE $timeFilter GROUP BY time($__interval) fill(previous)",
+          "query": "SELECT max(\"value\") * 80 FROM /queue_occ,sw=4217755253,port=.*,queue=0/ WHERE $timeFilter GROUP BY time($__interval) fill(previous)",
           "rawQuery": true,
           "refId": "D",
           "resultFormat": "time_series",
@@ -1154,7 +1145,7 @@
           "tags": []
         },
         {
-          "alias": "Total Number of Alerts Generated",
+          "alias": "Total Number of Broken Reports Received",
           "datasource": {
             "type": "influxdb",
             "uid": "CDCTEfb7k"
@@ -1230,7 +1221,7 @@
       }
     }
   ],
-  "refresh": "10s",
+  "refresh": "5s",
   "schemaVersion": 34,
   "style": "dark",
   "tags": [],
@@ -1238,7 +1229,7 @@
     "list": []
   },
   "time": {
-    "from": "now-30s",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {
@@ -1255,8 +1246,8 @@
     ]
   },
   "timezone": "",
-  "title": "AmLight-INT-Dev",
+  "title": "AmLight INT Collector",
   "uid": "6If5chtMk",
-  "version": 18,
+  "version": 29,
   "weekStart": ""
 }
