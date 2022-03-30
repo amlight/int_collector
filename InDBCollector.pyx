@@ -19,18 +19,17 @@
 
 from __future__ import print_function
 import threading
+import time
 from bcc import BPF
 from influxdb import InfluxDBClient
 from libc.stdint cimport uintptr_t
 
-# # TODO: FIX01
+
 cdef enum: __MAX_INT_HOP = 10  # 10 is the max for noviflow
-# _MAX_INT_HOP = __MAX_INT_HOP
 cdef struct Event:
     unsigned int seqNumber
     unsigned short vlan_id
     unsigned char  num_INT_hop
-    unsigned char  hop_negative
     unsigned int   sw_ids[__MAX_INT_HOP]
     unsigned short in_port_ids[__MAX_INT_HOP]
     unsigned short e_port_ids[__MAX_INT_HOP]
@@ -43,8 +42,8 @@ cdef struct Event:
     unsigned long int   flow_sink_time
     unsigned char  is_n_flow
     unsigned char  is_flow
-    unsigned char  is_hop_latency
-    unsigned char  is_queue_occup
+    unsigned short  is_hop_latency
+    unsigned short  is_queue_occup
 
 
 class InDBCollector(object):
@@ -145,7 +144,6 @@ class InDBCollector(object):
             # Print event data for debug
             if self.debug_mode==1:
                 print("*********")
-                print("hop_negative", event.hop_negative)
                 print("seqNumber", event.seqNumber)
                 print("vlan", event.vlan_id)
                 print("num_INT_hop", event.num_INT_hop)
@@ -166,39 +164,38 @@ class InDBCollector(object):
 
             event_data = []
 
-            # TODO: FIX02: Review these inputs
             # Commented out because by April 2021, there is only one switch.
             # if event.is_n_flow or event.is_flow:
             #     path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
             #
-            #     event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,eg_id=%d flow_latency=%d,path=\"%s\"%s" % (
+            #     event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,port=%d flow_latency=%d,path=\"%s\"%s" % (
             #                         event.vlan_id,
             #                         event.sw_ids[0],
             #                         event.e_port_ids[0],
             #                         event.flow_latency,
             #                         path_str,
-            #                         ' %d' % event.flow_sink_time if self.int_time else ''))
+            #                         int(round(time.time() * 1000000000)))))
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_hop_latency >> i) & 0x01:
-                        event_data.append(u"latency\\,vlan\\=%d\\,sw\\=%i\\,port\\=%d\\,hop\\=%i value=%d%s" %
+                        event_data.append(u"latency\\,vlan\\=%d\\,sw\\=%i\\,port\\=%d\\,hop\\=%i value=%d %s" %
                                           (event.vlan_id,
                                            event.sw_ids[0],
                                            event.e_port_ids[0],
                                            event.sw_ids[i],
                                            event.hop_latencies[i],
-                                           ' %d' % event.egr_times[i] if self.int_time else ''))
+                                           int(round(time.time() * 1000000000))))
 
             if event.is_queue_occup:
                 for i in range(0, event.num_INT_hop):
                     if (event.is_queue_occup >> i) & 0x01:
-                        event_data.append(u"queue_occ\\,sw\\=%d\\,port\\=%d\\,queue\\=%d value=%d%s" %
+                        event_data.append(u"queue_occ\\,sw\\=%d\\,port\\=%d\\,queue\\=%d value=%d %s" %
                                           (event.sw_ids[i],
                                            event.e_port_ids[i],
                                            event.queue_ids[i],
                                            event.queue_occups[i],
-                                           ' %d' % event.egr_times[i] if self.int_time else ''))
+                                           int(round(time.time() * 1000000000))))
 
             self.lock.acquire()
             self.event_data.extend(event_data)
