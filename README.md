@@ -1,4 +1,4 @@
-# int_collector
+# AmLight INT COllector
 
 The AmLight INT Collector is a telemetry solution that collects In-band Network Telemetry (INT) reports exported by NoviFlow Tofino-based switches. The NoviFlow Tofino-based switches export INT reports following the INT specification version 1.0.
 
