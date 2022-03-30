@@ -35,7 +35,7 @@ def parse_params():
     parser.add_argument("-D", "--database", default="INTdatabase",
                         help="Database name")
 
-    parser.add_argument("-P", "--event-period", default=0.5, type=float,
+    parser.add_argument("-P", "--event-period", default=0.1, type=float,
                         help="Interval in seconds to push event data. Default: 0.5 seconds.")
 
     parser.add_argument("-d", "--debug-mode", default=0, type=int,
@@ -47,10 +47,10 @@ def parse_params():
     parser.add_argument("-m", "--xdp-mode", default=0, type=int,
                         help="Set to 1 to hardware off. Default is Native mode")
 
-    parser.add_argument("--hop-latency", default=2000, type=int,
+    parser.add_argument("--hop-latency", default=50000, type=int,
                         help="Hop Latency variation in nanoseconds to monitor")
 
-    parser.add_argument("--flow-latency", default=50000, type=int,
+    parser.add_argument("--flow-latency", default=100000, type=int,
                         help="Flow Latency variation in nanoseconds to monitor")
 
     parser.add_argument("--queue-occ", default=80, type=int,
@@ -59,7 +59,7 @@ def parse_params():
     parser.add_argument("--interface-util-interval", default=0.5, type=int,
                         help="Interval in seconds between recording interface egress utilization")
 
-    parser.add_argument("--flow-keepalive", default=2000000000, type=int,
+    parser.add_argument("--flow-keepalive", default=3000000000, type=int,
                         help="Interval in ns to report flows even if there are no changes")
 
     parser.add_argument("--run-counter-mode-only", default=0, type=int,
