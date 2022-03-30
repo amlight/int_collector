@@ -36,7 +36,7 @@ def parse_params():
                         help="Database name")
 
     parser.add_argument("-P", "--event-period", default=0.1, type=float,
-                        help="Interval in seconds to push event data. Default: 0.5 seconds.")
+                        help="Interval in seconds to push event data. Default: 0.1 seconds.")
 
     parser.add_argument("-d", "--debug-mode", default=0, type=int,
                         help="Set to 1 to print event")
