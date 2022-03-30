@@ -199,14 +199,10 @@ struct egr_tx_info_t {
 };
 
 // Events
-
-// TODO: Change to u16 is_hop_latency:12 since we plan to use 10 switches (12 bits)
-// TODO: Change to u16 is_queue_occup:12 since we plan to use 10 switches (12 bits)
 struct flow_info_t {
     u32 seqNumber;
     u16 vlan_id;
     u8 num_INT_hop;
-    u8 hop_negative; // In case there is an error
     u32 sw_ids[MAX_INT_HOP];
     u16 in_port_ids[MAX_INT_HOP];
     u16 e_port_ids[MAX_INT_HOP];
@@ -219,14 +215,14 @@ struct flow_info_t {
     u64 flow_sink_time;  // sink timestamp provided
     u8 is_n_flow;  // is new flow?
     u8 is_flow;
-    u8 is_hop_latency;
-    u8 is_queue_occup;
+    u16 is_hop_latency;
+    u16 is_queue_occup;
 };
 
 BPF_PERF_OUTPUT(events);
 
 // Maps
-BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 1000);
+BPF_TABLE("lru_hash", struct flow_id_t, struct flow_info_t, tb_flow, 10000);
 BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
 BPF_TABLE("lru_hash", struct egress_eg_q_vlan_id_t, struct egr_tx_info_t, tb_egr_vlan_util, 5120);
 BPF_TABLE("lru_hash", struct egress_queue_util_id_t, struct egr_tx_info_t, tb_egr_queue_util, 520);
@@ -336,8 +332,6 @@ int collector(struct xdp_md *ctx) {
     /* NoviFlow doesn't support other instructions */
 
     u8 is_in_e_port_ids  = (INT_ins >> 14) & 0x1;
-    u8 is_hop_latencies  = (INT_ins >> 13) & 0x1;
-    u8 is_queue_occups 	 = (INT_ins >> 12) & 0x1;
     u8 is_ingr_times 	 = (INT_ins >> 11) & 0x1;
     u8 is_egr_times 	 = (INT_ins >> 10) & 0x1;
 
@@ -374,9 +368,8 @@ int collector(struct xdp_md *ctx) {
             flow_info.flow_latency += flow_info.hop_latencies[i];
         }
         else{
-            // Validation against damaged reports
-            flow_info.hop_negative = 1;
-            flow_info.hop_latencies[i] = 400;
+            // Validation against damaged reports: Reports can't be negative.
+            goto ERROR;
         }
 
         if (i < MAX_INT_HOP - 1) {
@@ -387,15 +380,15 @@ int collector(struct xdp_md *ctx) {
 
     }
 
-    /***************  Path store and change-detection  ***************/
-
-    u8 is_update = 0;
-
+    /*************** flow data structure  ***************/
     struct flow_id_t flow_id = {};
 
     flow_id.vlan_id = flow_info.vlan_id;
     flow_id.last_sw_id = flow_info.sw_ids[0];
     flow_id.last_egr_id = flow_info.e_port_ids[0];
+
+    /***************  Path store and change-detection  ***************/
+    u8 is_update = 0;
 
 #if ENABLE_THRESHOLD_MODE == 1
 
@@ -405,58 +398,54 @@ int collector(struct xdp_md *ctx) {
         flow_info.is_n_flow = 1;
         is_update = 1;
 
-        if (is_hop_latencies) {
-            switch (num_INT_hop) {
-                case 1: flow_info.is_hop_latency = 0x01; break;
-                case 2: flow_info.is_hop_latency = 0x03; break;
-                case 3: flow_info.is_hop_latency = 0x07; break;
-                case 4: flow_info.is_hop_latency = 0x0f; break;
-                case 5: flow_info.is_hop_latency = 0x1f; break;
-                case 6: flow_info.is_hop_latency = 0x3f; break;
-                case 7: flow_info.is_hop_latency = 0x7f; break;
-                case 8: flow_info.is_hop_latency = 0xff; break;
-                 // FIX01: MAX 8 for now
-                // case 9: flow_info.is_hop_latency = 0x1ff; break;
-                // case 10: flow_info.is_hop_latency = 0x3ff; break;
-                default: break;
-            }
+        switch (num_INT_hop) {
+            case 1: flow_info.is_hop_latency = 0x01; break;
+            case 2: flow_info.is_hop_latency = 0x03; break;
+            case 3: flow_info.is_hop_latency = 0x07; break;
+            case 4: flow_info.is_hop_latency = 0x0f; break;
+            case 5: flow_info.is_hop_latency = 0x1f; break;
+            case 6: flow_info.is_hop_latency = 0x3f; break;
+            case 7: flow_info.is_hop_latency = 0x7f; break;
+            case 8: flow_info.is_hop_latency = 0xff; break;
+             // FIX01: MAX 8 for now
+            // case 9: flow_info.is_hop_latency = 0x1ff; break;
+            // case 10: flow_info.is_hop_latency = 0x3ff; break;
+            default: break;
         }
+
 
     } else {
 
-        // only need periodically push for flow info, so we can know the live status of the flow
-        // the current timestamp is only 32 bits. Only supports 4 seconds.
-        // If there is no alarm, just one record per second should suffice as keepalive.
-        // The issue is that flow_sink_time will zero too fast.
-
-        if ((flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time)
-            | (is_hop_latencies & (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY))
-            ) {
-
+        // If flow latency changed over the threshold, record it.
+        if (ABS(flow_info.flow_latency, flow_info_p->flow_latency) > FLOW_LATENCY){
             flow_info.is_flow = 1;
             is_update = 1;
         }
 
+        // From here is hop delay, not flow latency.
         _num_INT_hop = num_INT_hop;
         #pragma unroll
         for (u8 i = 0; i < MAX_INT_HOP; i++) {
 
-            // TODO: FIX: Must check if ingress or egress ports are the same.
+            // Check if path changed
             if (unlikely(flow_info.sw_ids[i] != flow_info_p->sw_ids[i])) {
                 is_update = 1;
-
                 flow_info.is_flow = 1;
-
-                if (is_hop_latencies) {
-                    flow_info.is_hop_latency |= 1 << i;
-                }
+                flow_info.is_hop_latency |= 1 << i;
             }
 
-            if (unlikely(is_hop_latencies &
-                (ABS(flow_info.hop_latencies[i], flow_info_p->hop_latencies[i]) > HOP_LATENCY))) {
-
-                flow_info.is_hop_latency |= 1 << i;
+            // If hop latency changed over the threshold, record it.
+            if (unlikely(ABS(flow_info.hop_latencies[i], flow_info_p->hop_latencies[i]) > HOP_LATENCY)) {
                 is_update = 1;
+                flow_info.is_hop_latency |= 1 << i;
+            }
+
+            // Interval between the current and last packet is more than TIME_GAP_W
+            // even if it doesn't reach the thresholds (keepalive)
+            if (unlikely(!is_update) & (flow_info_p->flow_sink_time + TIME_GAP_W < flow_info.flow_sink_time)){
+                is_update = 1;
+                flow_info.is_hop_latency |= 1 << i;
+                flow_info.is_flow = 1;
             }
 
             if (i < MAX_INT_HOP - 1) {
@@ -480,42 +469,42 @@ int collector(struct xdp_md *ctx) {
     _num_INT_hop = num_INT_hop;
     #pragma unroll
     for (u8 i = 0; i < MAX_INT_HOP; i++) {
-        if (is_queue_occups) {
 
-            queue_id.sw_id = flow_info.sw_ids[i];
-            queue_id.p_id = flow_info.e_port_ids[i];
-            queue_id.q_id = flow_info.queue_ids[i];
+        queue_id.sw_id = flow_info.sw_ids[i];
+        queue_id.p_id = flow_info.e_port_ids[i];
+        queue_id.q_id = flow_info.queue_ids[i];
 
-            queue_info.occup = flow_info.queue_occups[i];
-//            queue_info.q_time = flow_info.egr_times[i];
-            queue_info.q_time = flow_info.flow_sink_time;
+        queue_info.occup = flow_info.queue_occups[i];
+        queue_info.q_time = flow_info.flow_sink_time;
 
-            is_update = 0;
+        is_update = 0;
 
-            queue_info_p = tb_queue.lookup(&queue_id);
-            if(unlikely(!queue_info_p)) {
+        queue_info_p = tb_queue.lookup(&queue_id);
+        if(unlikely(!queue_info_p)) {
+            flow_info.is_queue_occup |= 1 << i;
+            is_update = 1;
+        } else {
 
+            // Threshold for queue occupancy
+            if (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP)) {
                 flow_info.is_queue_occup |= 1 << i;
                 is_update = 1;
-
-            } else {
-//                if (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP)) {
-                if ((queue_info_p->q_time + TIME_GAP_W < flow_info.flow_sink_time)
-                            | (unlikely(ABS(queue_info.occup, queue_info_p->occup) > QUEUE_OCCUP))) {
-                    flow_info.is_queue_occup |= 1 << i;
-                    is_update = 1;
-                }
             }
 
-            if (is_update)
-                tb_queue.update(&queue_id, &queue_info);
-
-            if (i < MAX_INT_HOP - 1) {
-                _num_INT_hop--;
-                if (_num_INT_hop <= 0)
-                    break;
+            // Flow keepalive if threshold is not reached
+            if (unlikely((!is_update) & (queue_info_p->q_time + TIME_GAP_W < flow_info.flow_sink_time))){
+                flow_info.is_queue_occup |= 1 << i;
+                is_update = 1;
             }
+        }
 
+        if (is_update)
+            tb_queue.update(&queue_id, &queue_info);
+
+        if (i < MAX_INT_HOP - 1) {
+            _num_INT_hop--;
+            if (_num_INT_hop <= 0)
+                break;
         }
     }
 
@@ -597,14 +586,11 @@ int collector(struct xdp_md *ctx) {
 
 #endif
 
-    // debug:
-    // flow_info.is_flow = 1;
     // submit event info to user space
     if (unlikely(flow_info.is_n_flow |
                  flow_info.is_hop_latency |
                  flow_info.is_queue_occup |
-                 flow_info.is_flow
-                 )){
+                 flow_info.is_flow)){
         events.perf_submit(ctx, &flow_info, sizeof(flow_info));
         value = 2;
         counter_int.increment(value);
