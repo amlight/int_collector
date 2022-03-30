@@ -126,22 +126,6 @@ if __name__ == "__main__":
 
             if event_data:
                 # TODO: handle timeouts
-                # Exception in thread Thread-1:
-                # Traceback (most recent call last):
-                #   File "/usr/lib/python3.6/threading.py", line 916, in _bootstrap_inner
-                #     self.run()
-                #   File "/usr/lib/python3.6/threading.py", line 864, in run
-                #     self._target(*self._args, **self._kwargs)
-                #   File "InDBClient.py", line 104, in _event_push
-                #     collector.client.write_points(points=data, protocol="line")
-                #   File "/usr/local/lib/python3.6/dist-packages/influxdb/client.py", line 599, in write_points
-                #     consistency=consistency)
-                #   File "/usr/local/lib/python3.6/dist-packages/influxdb/client.py", line 676, in _write_points
-                #     protocol=protocol
-                #   File "/usr/local/lib/python3.6/dist-packages/influxdb/client.py", line 410, in write
-                #     headers=headers
-                #   File "/usr/local/lib/python3.6/dist-packages/influxdb/client.py", line 364, in request
-                #     raise InfluxDBServerError(reformat_error(response))
                 # influxdb.exceptions.InfluxDBServerError: b'{"error":"timeout"}\n'
                 collector.client.write_points(points=event_data, protocol="line")
             del event_data
