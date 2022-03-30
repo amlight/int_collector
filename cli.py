@@ -56,7 +56,7 @@ def parse_params():
     parser.add_argument("--queue-occ", default=80, type=int,
                         help="Queue Occupancy threshold to monitor")
 
-    parser.add_argument("--interface-util-interval", default=0.5, type=int,
+    parser.add_argument("--interface-util-interval", default=0.5, type=float,
                         help="Interval in seconds between recording interface egress utilization")
 
     parser.add_argument("--flow-keepalive", default=3000000000, type=int,
