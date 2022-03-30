@@ -106,8 +106,8 @@ Each option is explained in more details below:
 At AmLight, the INT Collector node has a quad-10G Intel NIC, all four ports receiving the INT reports. For scalability purposes, we use the options --run-counter-mode-only and --run-threshold-mode-only, each listing on a different NIC:
 
 ```Shell
-python InDBClient.py --interface=intel-10g-02 --run-counter-mode-only=1 --database=INT-Counters --interface-util-interval=0.4 --port=5900 &
-python InDBClient.py --interface=intel-10g-03 --run-threshold-mode-only=1 --database=INT-Thresholds --hop-latency=80000 --queue-occ=160 --flow-keepalive=4 --port=5900 &
+python InDBClient.py --interface=intel-10g-02 --run-counter-mode-only=1 --database=INT-Counters --interface-util-interval=0.4 --int-port=5900 &
+python InDBClient.py --interface=intel-10g-03 --run-threshold-mode-only=1 --database=INT-Thresholds --hop-latency=80000 --queue-occ=160 --flow-keepalive=4 --int-port=5900 &
 ```
 
 For more defails about the INT deployment at AmLight, watch our presentation at the ESnet CI Lunch and Learn:
