@@ -1,4 +1,4 @@
-# AmLight INT COllector
+# AmLight INT Collector
 
 The AmLight INT Collector is a telemetry solution that collects In-band Network Telemetry (INT) reports exported by NoviFlow Tofino-based switches. The NoviFlow Tofino-based switches export INT reports following the INT specification version 1.0.
 
@@ -9,21 +9,13 @@ The AmLight INT Collector is a telemetry solution that collects In-band Network 
 Follow instruction from https://github.com/iovisor/bcc/
 ```
 * Install Python 3.9 or newer
-```Shell
-Follow instruction from https://www.python.org/
-```
+
 * Install Git
-```Shell
-apt-get install git
-```
+
 * Install influxdb
-```Shell
-Follow instruction from 
-```
+
 * Install Grafana
-```Shell
-Follow instruction from 
-```
+
 * Clone the repository
 ```Shell
 git clone https://github.com/amlight/int_collector.git
