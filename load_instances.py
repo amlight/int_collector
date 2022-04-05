@@ -23,51 +23,54 @@ import time
 import sys
 
 import pyximport; pyximport.install()
-import InDBCollector
-import cli
+import libs.xdp_code.InDBCollector as Collector
+from libs.input.parse_cli import parse_params
 
 
-if __name__ == "__main__":
+def start_collector_instance():
+    """ This function loads the INT Collector. This instance is loaded via Popen() """
 
-    args = cli.parse_params()
+    args = parse_params()
+
+    print("Loading INT_Collector on interface %s" % args.interface)
 
     enable_threshold = 0 if args.run_counter_mode_only else 1
     enable_counter = 0 if args.run_threshold_mode_only else 1
 
-    collector = InDBCollector.InDBCollector(int_dst_port=args.int_port,
-                                            debug_int=args.debug_mode,
-                                            host=args.host,
-                                            database=args.database,
-                                            flags=args.xdp_mode,
-                                            hop_latency=args.hop_latency,
-                                            flow_latency=args.flow_latency,
-                                            queue_occ=args.queue_occ,
-                                            flow_keepalive=args.flow_keepalive,
-                                            enable_counter_mode=enable_counter,
-                                            enable_threshold_mode=enable_threshold)
+    collector = Collector.Collector(int_dst_port=args.int_port,
+                                    debug_int=args.debug_mode,
+                                    host=args.host,
+                                    database=args.db_name,
+                                    flags=args.xdp_mode,
+                                    hop_latency=args.hop_latency,
+                                    flow_latency=args.flow_latency,
+                                    queue_occ=args.queue_occ,
+                                    flow_keepalive=args.flow_keepalive,
+                                    enable_counter_mode=enable_counter,
+                                    enable_threshold_mode=enable_threshold)
 
     # Attach XDP code to interface
     _ = os.system("ifconfig %s promisc" % args.interface)
     collector.attach_iface(args.interface)
 
-    # Test if database is not found,create one
-    if args.database not in collector.client.get_list_database():
-        collector.client.create_database(args.database)
+    # Test if db_name is not found,create one
+    if args.db_name not in collector.client.get_list_database():
+        collector.client.create_database(args.db_name)
 
-    # If database is needs to be recreated
-    if args.new_measurements:
-        if args.database in collector.client.get_list_database():
-            collector.client.drop_database(args.database)
-        collector.client.create_database(args.database)
+    # If db_name is needs to be recreated
+    if args.drop_db:
+        if args.db_name in collector.client.get_list_db_name():
+            collector.client.drop_db_name(args.db_name)
+        collector.client.create_database(args.db_name)
 
     push_stop_flag = threading.Event()
 
-    # A separated thread to push event data to the database
+    # A separated thread to push event data to the db_name
     def _event_push():
 
         while not push_stop_flag.is_set():
 
-            time.sleep(args.event_period)
+            time.sleep(args.save_interval)
 
             collector.lock.acquire()
             data = collector.event_data
@@ -90,7 +93,7 @@ if __name__ == "__main__":
 
         while not gather_stop_flag.is_set():
 
-            time.sleep(args.interface_util_interval)
+            time.sleep(args.counters_interval)
             event_data = []
 
             for k, v in sorted(collector.packet_counter_all.items()):
@@ -156,3 +159,8 @@ if __name__ == "__main__":
 
         _ = os.system("ifconfig %s -promisc" % args.interface)
         print("Done")
+
+
+if __name__ == "__main__":
+    """ Starts a new instance of the INT Collector """
+    start_collector_instance()

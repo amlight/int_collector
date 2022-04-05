@@ -27,7 +27,7 @@ pip3 install -r requirements.txt
 ```
 * Run it to make sure everything is in place (use CTRL+C to end it)
 ```Shell
-python InDBClient.py -i lo
+python load_instances.py -i lo
 ```
 * Import the dashboards from folder ./grafana-dashboards.
 * Done.
@@ -37,8 +37,8 @@ python InDBClient.py -i lo
 The AmLight INT Collector has several options. Use --help to access them:
 
 ```Shell
-python InDBClient.py --help
-usage: InDBClient.py [-h] [-i INTERFACE] [-p INT_PORT] [-H HOST] [-D DATABASE] [-P EVENT_PERIOD] [-d DEBUG_MODE] [-n NEW_MEASUREMENTS] [-m XDP_MODE]
+python load_instances.py --help
+usage: load_instances.py [-h] [-i INTERFACE] [-p INT_PORT] [-H HOST] [-D DATABASE] [-P EVENT_PERIOD] [-d DEBUG_MODE] [-n NEW_MEASUREMENTS] [-m XDP_MODE]
                      [--hop-latency HOP_LATENCY] [--flow-latency FLOW_LATENCY] [--queue-occ QUEUE_OCC] [--interface-util-interval INTERFACE_UTIL_INTERVAL]
                      [--flow-keepalive FLOW_KEEPALIVE] [--run-counter-mode-only RUN_COUNTER_MODE_ONLY] [--run-threshold-mode-only RUN_THRESHOLD_MODE_ONLY]
 
@@ -75,6 +75,11 @@ optional arguments:
                         Run on Counter mode (only statistics)
   --run-threshold-mode-only RUN_THRESHOLD_MODE_ONLY
                         Run on Threshold mode (only queues and delays)
+  --config-file CONFIG_FILE
+                        Config file to instantiate more than one instance
+  --numa-group NUMA_GROUP
+                        Set the proper NUMA_GROUP for CPU affinity/better performance
+
 ```
 
 Each option is explained in more details below:
@@ -98,8 +103,8 @@ Each option is explained in more details below:
 At AmLight, the INT Collector node has a quad-10G Intel NIC, all four ports receiving the INT reports. For scalability purposes, we use the options --run-counter-mode-only and --run-threshold-mode-only, each listing on a different NIC:
 
 ```Shell
-python InDBClient.py --interface=intel-10g-02 --run-counter-mode-only=1 --database=INT-Counters --interface-util-interval=0.4 --int-port=5900 &
-python InDBClient.py --interface=intel-10g-03 --run-threshold-mode-only=1 --database=INT-Thresholds --hop-latency=80000 --queue-occ=160 --flow-keepalive=4 --int-port=5900 &
+python load_instances.py --interface=intel-10g-02 --run-counter-mode-only=1 --database=INT-Counters --interface-util-interval=0.4 --int-port=5900 &
+python load_instances.py --interface=intel-10g-03 --run-threshold-mode-only=1 --database=INT-Thresholds --hop-latency=80000 --queue-occ=160 --flow-keepalive=4 --int-port=5900 &
 ```
 
 For more defails about the INT deployment at AmLight, watch our presentation at the ESnet CI Lunch and Learn:

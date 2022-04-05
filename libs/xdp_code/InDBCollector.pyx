@@ -17,7 +17,6 @@
 #
 
 
-from __future__ import print_function
 import threading
 import time
 from bcc import BPF
@@ -46,8 +45,8 @@ cdef struct Event:
     unsigned short  is_queue_occup
 
 
-class InDBCollector(object):
-    """docstring for InDBCollector"""
+class Collector(object):
+    """docstring for Collector"""
 
     def __init__(self,
                  int_dst_port,
@@ -62,7 +61,7 @@ class InDBCollector(object):
                  enable_counter_mode,
                  enable_threshold_mode):
 
-        super(InDBCollector, self).__init__()
+        super(Collector, self).__init__()
 
         self.int_dst_port = int_dst_port
         self.hop_latency = hop_latency
@@ -71,8 +70,6 @@ class InDBCollector(object):
         self.flow_keepalive = flow_keepalive
         self.enable_counter_mode = enable_counter_mode
         self.enable_threshold_mode = enable_threshold_mode
-
-        self.int_time = False
 
         self.ifaces = set()
 

@@ -1,3 +1,6 @@
 influxdb
 Cython
 argparse
+configparser
+shlex
+subprocess
