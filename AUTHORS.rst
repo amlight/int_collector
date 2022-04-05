@@ -1,7 +1,7 @@
 Authors
 *******
 
-- Tu Nguyen Van <vantu.bkhn@gmail.com>
+- Tu Nguyen Van <vantu DOT bkhn AT gmail.com>
 - Jeronimo Bezerra <jab AT amlight DOT net>
 
 Contributors
