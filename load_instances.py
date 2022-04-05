@@ -50,7 +50,8 @@ def start_collector_instance():
                                     enable_threshold_mode=enable_threshold)
 
     # Attach XDP code to interface
-    _ = os.system("ifconfig %s promisc" % args.interface)
+    if args.promisc:
+        _ = os.system("ifconfig %s promisc" % args.interface)
     collector.attach_iface(args.interface)
 
     # Test if db_name is not found,create one
@@ -157,7 +158,8 @@ def start_collector_instance():
 
         collector.detach_all_iface()
 
-        _ = os.system("ifconfig %s -promisc" % args.interface)
+        if args.promisc:
+            _ = os.system("ifconfig %s -promisc" % args.interface)
         print("Done")
 
 

@@ -60,6 +60,9 @@ def parse_params():
     parser.add_argument("--flow-keepalive", default=3000000000, type=int,
                         help="Interval in nanoseconds to report flows even if there are no changes")
 
+    parser.add_argument("--promisc", action="store_true",
+                        help="Change the interface to operate in promisc mode.")
+
     # Counter mode options
     parser.add_argument("--run-counter-mode-only", action="store_true",
                         help="Run on Counter mode (only counters gathering)")

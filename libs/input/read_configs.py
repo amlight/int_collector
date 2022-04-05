@@ -59,10 +59,3 @@ def read_config_file(config_file):
         sys.exit(1)
 
     return my_configs
-
-
-if __name__ == "__main__":
-    my = read_config_file("../../etc/collector.ini")
-    for i in my:
-        print(i)
-

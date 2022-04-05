@@ -38,6 +38,7 @@ class MyDefaultConfig(object):
         self._queue_occ = 225
         self._flow_latency = 100000
         self._hop_latency = 50000
+        self._promisc = False
 
         self.import_config(section_config)
 
@@ -169,6 +170,14 @@ class MyDefaultConfig(object):
     def hop_latency(self, value):
         self._hop_latency = int(value)
 
+    @property
+    def promisc(self):
+        return self._promisc
+
+    @promisc.setter
+    def promisc(self, value):
+        self._promisc = True if value == "True" else False
+
     def import_config(self, configs):
         """ Import configs from dictionary """
 
@@ -223,6 +232,9 @@ class MyDefaultConfig(object):
         if "numa_group" in configs:
             self.numa_group = configs["numa_group"]
 
+        if "promisc" in configs:
+            self.promisc = configs["promisc"]
+
     def is_config_accurate(self):
         """ Other than validating the inputs in the setter methods, here we evaluate what is
         mandatory. """
@@ -258,12 +270,13 @@ class MyDefaultConfig(object):
                 # Boolean options have no values
                 params.append("--%s" % method)
 
+            # Remove default values
             elif (value and
                   not (method == "int_port" and value == 5900) and
-                  not (method == "db_host" and value == "localhost")):  # Remove default values
+                  not (method == "db_host" and value == "localhost")):
 
-                if ((self.mode == 1 and method not in ["queue_occ", "flow_latency",
-                                                       "hop_latency", "save_interval"]) or
+                if ((self.mode == 1 and
+                     method not in ["queue_occ", "flow_latency", "hop_latency", "save_interval"]) or
                         (self.mode == 2 and method not in ["save_interval"]) or self.mode == 0):
 
                     params.append("--%s=%s" % (method.replace("_", "-"), value))
