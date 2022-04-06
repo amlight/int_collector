@@ -74,7 +74,7 @@ class Collector(object):
         self.ifaces = set()
 
         #load eBPF program
-        self.bpf_collector = BPF(src_file="BPFCollector.c", debug=0,
+        self.bpf_collector = BPF(src_file="./libs/xdp_code/BPFCollector.c", debug=0,
                                  cflags=["-w",
                                          "-D_INT_DST_PORT=%s" % self.int_dst_port,
                                          "-D_HOP_LATENCY=%s" % self.hop_latency,
@@ -141,23 +141,23 @@ class Collector(object):
             # Print event data for debug
             if self.debug_mode==1:
                 print("*********")
-                print("seqNumber", event.seqNumber)
-                print("vlan", event.vlan_id)
-                print("num_INT_hop", event.num_INT_hop)
-                print("sw_ids", event.sw_ids)
-                print("in_port_ids", event.in_port_ids)
-                print("e_port_ids", event.e_port_ids)
-                print("hop_latencies", event.hop_latencies)
-                print("queue_ids", event.queue_ids)
-                print("queue_occups", event.queue_occups)
-                print("ingr_times", event.ingr_times)
-                print("egr_times", event.egr_times)
-                print("flow_latency", event.flow_latency)
-                print("flow_sink_time", event.flow_sink_time)
-                print("is_n_flow", event.is_n_flow)
-                print("is_flow", event.is_flow)
-                print("is_hop_latency", event.is_hop_latency)
-                print("is_queue_occup", event.is_queue_occup)
+                print(f"seqNumber: {event.seqNumber}")
+                print(f"vlan: {event.vlan_id}")
+                print(f"num_INT_hop: {event.num_INT_hop}")
+                print(f"sw_ids: {event.sw_ids}")
+                print(f"in_port_ids: {event.in_port_ids}")
+                print(f"e_port_ids: {event.e_port_ids}")
+                print(f"hop_latencie: {event.hop_latencies}")
+                print(f"queue_ids: {event.queue_ids}")
+                print(f"queue_occups: {event.queue_occups}")
+                print(f"ingr_times: {event.ingr_times}")
+                print(f"egr_times: {event.egr_times}")
+                print(f"flow_latency: {event.flow_latency}")
+                print(f"flow_sink_time: {event.flow_sink_time}")
+                print(f"is_n_flow: { event.is_n_flow}")
+                print(f"is_flow: {event.is_flow}")
+                print(f"is_hop_latency: {event.is_hop_latency}")
+                print(f"is_queue_occup: {event.is_queue_occup}")
 
             event_data = []
 
