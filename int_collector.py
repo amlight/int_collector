@@ -15,6 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+""" The int_collector.py is responsible for starting the INT Collector's instances """
 
 import sys
 import os
@@ -37,7 +38,11 @@ if not instances:
 for instance in instances:
     # Get current full path
     full_path = "%s %s/load_instances.py " % (sys.executable, os.getcwd())
+    # Get the params per instance in Shell format (--command=etc)
     cmd = full_path + str(instance)
-
+    # Split the options in Shell format
     cmds = shlex.split(cmd)
-    p = subprocess.Popen(cmds, start_new_session=True)
+    # Start the instance as a process in background
+    p = subprocess.Popen(cmds, start_new_session=True)  # pylint: disable=R1732
+
+sys.exit(0)

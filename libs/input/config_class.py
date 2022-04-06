@@ -15,6 +15,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+""" This class is used to centralize all configs, provided via CLI or config file """
+
+
+import distutils.core
 
 
 class MyDefaultConfig(object):
@@ -44,139 +48,173 @@ class MyDefaultConfig(object):
 
     @property
     def enable(self):
+        """ Getter """
         return self._enable
 
     @enable.setter
     def enable(self, value):
-        self._enable = True if value == "True" else False
+        """ Setter """
+        self._enable = distutils.util.strtobool(value)
 
     @property
     def interface(self):
+        """ Getter """
         return self._interface
 
     @interface.setter
     def interface(self, value):
+        """ Setter """
         self._interface = value
 
     @property
     def mode(self):
+        """ Getter """
         return self._mode
 
     @mode.setter
     def mode(self, value):
+        """ Setter """
         self._mode = int(value) if int(value) in [1, 2] else 0
 
     @property
     def xdp_mode(self):
+        """ Getter """
         return self._xdp_mode
 
     @xdp_mode.setter
     def xdp_mode(self, value):
+        """ Setter """
         self._xdp_mode = bool(value)
 
     @property
     def numa_group(self):
+        """ Getter """
         return self._numa_group
 
     @numa_group.setter
     def numa_group(self, value):
+        """ Setter """
         self._numa_group = int(value)
 
     @property
     def int_port(self):
+        """ Getter """
         return self._int_port
 
     @int_port.setter
     def int_port(self, value):
+        """ Setter """
         self._int_port = int(value)
 
     @property
     def debug(self):
+        """ Getter """
         return self._debug
 
     @debug.setter
     def debug(self, value):
+        """ Setter """
         self._debug = bool(value)
 
     @property
     def db_host(self):
+        """ Getter """
         return self._db_host
 
     @db_host.setter
     def db_host(self, value):
+        """ Setter """
         self._db_host = value
 
     @property
     def db_name(self):
+        """ Getter """
         return self._db_name
 
     @db_name.setter
     def db_name(self, value):
+        """ Setter """
         self._db_name = value
 
     @property
     def drop_db(self):
+        """ Getter """
         return self._drop_db
 
     @drop_db.setter
     def drop_db(self, value):
+        """ Setter """
         self._drop_db = bool(value)
 
     @property
     def counters_interval(self):
+        """ Getter """
         return self._counters_interval
 
     @counters_interval.setter
     def counters_interval(self, value):
+        """ Setter """
         self._counters_interval = float(value)
 
     @property
     def save_interval(self):
+        """ Getter """
         return self._save_interval
 
     @save_interval.setter
     def save_interval(self, value):
+        """ Setter """
         self._save_interval = float(value)
 
     @property
     def flow_keepalive(self):
+        """ Getter """
         return self._flow_keepalive
 
     @flow_keepalive.setter
     def flow_keepalive(self, value):
+        """ Setter """
         self._flow_keepalive = int(value)
 
     @property
     def queue_occ(self):
+        """ Getter """
         return self._queue_occ
 
     @queue_occ.setter
     def queue_occ(self, value):
+        """ Setter """
         self._queue_occ = int(value)
 
     @property
     def flow_latency(self):
+        """ Getter """
         return self._flow_latency
 
     @flow_latency.setter
     def flow_latency(self, value):
+        """ Setter """
         self._flow_latency = int(value)
 
     @property
     def hop_latency(self):
+        """ Getter """
         return self._hop_latency
 
     @hop_latency.setter
     def hop_latency(self, value):
+        """ Setter """
         self._hop_latency = int(value)
 
     @property
     def promisc(self):
+        """ Getter """
         return self._promisc
 
     @promisc.setter
     def promisc(self, value):
-        self._promisc = True if value == "True" else False
+        """ Setter """
+        self._promisc = distutils.util.strtobool(value)
 
     def import_config(self, configs):
         """ Import configs from dictionary """
@@ -252,7 +290,9 @@ class MyDefaultConfig(object):
         params = list()
         methods = []
         for method in dir(MyDefaultConfig):
-            if not (method.startswith('__') or method.startswith('is_') or method.startswith('import')):
+            if not (method.startswith('__')
+                    or method.startswith('is_')
+                    or method.startswith('import')):
                 if method != "enable":
                     methods.append(method)
 

@@ -15,16 +15,16 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+""" This module is used to load individual instances of the INT Collector.
+It is called by int_collector.py via Popen as an independent process. """
 
 import os
 import threading
 import time
 import sys
-
-import pyximport; pyximport.install()
-import libs.xdp_code.InDBCollector as Collector
-from libs.input.parse_cli import parse_params
+import pyximport; pyximport.install()  # pylint: disable=C0321
+import libs.xdp_code.InDBCollector as Collector  # pylint: disable=C0413
+from libs.input.parse_cli import parse_params  # pylint: disable=C0413
 
 
 def start_collector_instance():
@@ -32,7 +32,7 @@ def start_collector_instance():
 
     args = parse_params()
 
-    print("Loading INT_Collector on interface %s" % args.interface)
+    print(f"Loading INT_Collector on interface {args.interface}")
 
     enable_threshold = 0 if args.run_counter_mode_only else 1
     enable_counter = 0 if args.run_threshold_mode_only else 1
@@ -51,7 +51,7 @@ def start_collector_instance():
 
     # Attach XDP code to interface
     if args.promisc:
-        _ = os.system("ifconfig %s promisc" % args.interface)
+        _ = os.system(f"ifconfig {args.interface} promisc")
     collector.attach_iface(args.interface)
 
     # Test if db_name is not found,create one
@@ -107,10 +107,10 @@ def start_collector_instance():
                 event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
             for k, v in collector.tb_egr.items():
-                event_data.append("tx_octs\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d" %
-                                  (k.sw_id, k.p_id, k.q_id, k.v_id, v.octets))
-                event_data.append("tx_pkts\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d" %
-                                  (k.sw_id, k.p_id, k.q_id, k.v_id, v.packets))
+                insert = "tx_octs\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d"
+                event_data.append(insert % (k.sw_id, k.p_id, k.q_id, k.v_id, v.octets))
+                insert = "tx_pkts\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d"
+                event_data.append(insert % (k.sw_id, k.p_id, k.q_id, k.v_id, v.packets))
 
             for k, v in collector.tb_egr_q.items():
                 event_data.append(
@@ -159,10 +159,9 @@ def start_collector_instance():
         collector.detach_all_iface()
 
         if args.promisc:
-            _ = os.system("ifconfig %s -promisc" % args.interface)
+            _ = os.system(f"ifconfig {args.interface} -promisc")
         print("Done")
 
 
 if __name__ == "__main__":
-    """ Starts a new instance of the INT Collector """
     start_collector_instance()

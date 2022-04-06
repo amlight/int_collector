@@ -15,16 +15,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
+""" This module handles CLI parameters via argparse"""
 
 
 import argparse
 
 
 def parse_params():
+    """ This module handles CLI parameters via argparse"""
 
     parser = argparse.ArgumentParser(description='INT Collector CLI Options')
 
-    # Mandatory
+    # Mandatory if --config-file not used. It's handled later.
     parser.add_argument("-i", "--interface",
                         help="Interface to receive INT reports")
 

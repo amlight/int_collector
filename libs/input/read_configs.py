@@ -15,7 +15,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 #
-
+""" This module reads the configuration file and returns MyDefaultConfig class per section """
 import sys
 from configparser import ConfigParser, DuplicateOptionError
 from libs.input.config_class import MyDefaultConfig
@@ -35,7 +35,7 @@ def evaluate_configs(configs):
 
 
 def read_config_file(config_file):
-    """ """
+    """ Read the configuration file. """
     config = ConfigParser()
     config.sections()
     try:
