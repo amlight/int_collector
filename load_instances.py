@@ -25,6 +25,7 @@ import sys
 import pyximport; pyximport.install()  # pylint: disable=C0321
 import libs.xdp_code.InDBCollector as Collector  # pylint: disable=C0413
 from libs.input.parse_cli import parse_params  # pylint: disable=C0413
+import influxdb
 
 
 def start_collector_instance():
@@ -60,7 +61,7 @@ def start_collector_instance():
 
     # If db_name is needs to be recreated
     if args.drop_db:
-        if args.db_name in collector.client.get_list_db_name():
+        if args.db_name in collector.client.get_list_database():
             collector.client.drop_db_name(args.db_name)
         collector.client.create_database(args.db_name)
 
@@ -82,7 +83,11 @@ def start_collector_instance():
                 print("Len of events: ", len(data))
 
             if data:
-                collector.client.write_points(points=data, protocol="line")
+                try:
+                    collector.client.write_points(points=data, protocol="line")
+                except influxdb.exceptions.InfluxDBClientError as error:
+                    print(error)
+                    print(len(data))
 
     event_push = threading.Thread(target=_event_push)
     event_push.start()
