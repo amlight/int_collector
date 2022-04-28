@@ -33,8 +33,6 @@ def start_collector_instance():
 
     args = parse_params()
 
-    print(f"Loading INT_Collector on interface {args.interface}")
-
     enable_threshold = 0 if args.run_counter_mode_only else 1
     enable_counter = 0 if args.run_threshold_mode_only else 1
 
@@ -144,9 +142,6 @@ def start_collector_instance():
 
     # Start polling events
     collector.open_events()
-
-    print("eBPF progs Loaded.")
-    sys.stdout.flush()
 
     try:
         while 1:

@@ -25,7 +25,7 @@ import subprocess
 from libs.input.cli import get_options
 
 
-VERSION = "version1.1"
+VERSION = "1.1"
 
 # Get CLI vs. Config options.
 instances = get_options()
@@ -43,6 +43,12 @@ for instance in instances:
     # Split the options in Shell format
     cmds = shlex.split(cmd)
     # Start the instance as a process in background
-    p = subprocess.Popen(cmds, start_new_session=True)  # pylint: disable=R1732
+    process = subprocess.Popen(cmds, start_new_session=True)  # pylint: disable=R1732
+
+    # Write PID file
+    pidfile = open(instance.name + '.pid', 'w')
+    pidfile.write(str(process.pid))
+    pidfile.close()
+    print(f"INT Collector: Instance {instance.name} (PID {process.pid}) is running on {instance.interface}.")
 
 sys.exit(0)

@@ -35,6 +35,9 @@ def parse_params():
 
     # Optional
 
+    parser.add_argument("--name",
+                        help="Label for this instance.")
+
     parser.add_argument("-c", "--config-file",
                         help="Use configs from file.")
 

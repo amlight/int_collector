@@ -19,6 +19,7 @@
 
 
 import distutils.core
+import sys
 
 
 class MyDefaultConfig(object):
@@ -47,6 +48,16 @@ class MyDefaultConfig(object):
         self.import_config(section_config)
 
     @property
+    def name(self):
+        """ Getter """
+        return self._name
+
+    @name.setter
+    def name(self, value):
+        """ Setter """
+        self._name = value
+
+    @property
     def enable(self):
         """ Getter """
         return self._enable
@@ -54,7 +65,7 @@ class MyDefaultConfig(object):
     @enable.setter
     def enable(self, value):
         """ Setter """
-        self._enable = distutils.util.strtobool(value)
+        self._enable = bool(distutils.util.strtobool(value))
 
     @property
     def interface(self):
@@ -74,7 +85,16 @@ class MyDefaultConfig(object):
     @mode.setter
     def mode(self, value):
         """ Setter """
-        self._mode = int(value) if int(value) in [1, 2] else 0
+        try:
+            value = int(value)
+        except (ValueError, TypeError):
+            raise(ValueError("Invalid Mode Value Provided"))
+
+        if isinstance(value, int) and value in [0, 1, 2]:
+            self._mode = value
+        else:
+            raise ValueError("Invalid Mode Value Provided")
+
 
     @property
     def xdp_mode(self):
@@ -84,7 +104,7 @@ class MyDefaultConfig(object):
     @xdp_mode.setter
     def xdp_mode(self, value):
         """ Setter """
-        self._xdp_mode = bool(value)
+        self._xdp_mode = bool(distutils.util.strtobool(value))
 
     @property
     def numa_group(self):
@@ -114,7 +134,7 @@ class MyDefaultConfig(object):
     @debug.setter
     def debug(self, value):
         """ Setter """
-        self._debug = bool(value)
+        self._debug = bool(distutils.util.strtobool(value))
 
     @property
     def db_host(self):
@@ -144,7 +164,7 @@ class MyDefaultConfig(object):
     @drop_db.setter
     def drop_db(self, value):
         """ Setter """
-        self._drop_db = bool(value)
+        self._drop_db = bool(distutils.util.strtobool(value))
 
     @property
     def counters_interval(self):
@@ -214,7 +234,7 @@ class MyDefaultConfig(object):
     @promisc.setter
     def promisc(self, value):
         """ Setter """
-        self._promisc = distutils.util.strtobool(value)
+        self._promisc = bool(distutils.util.strtobool(value))
 
     def import_config(self, configs):
         """ Import configs from dictionary """
@@ -277,7 +297,7 @@ class MyDefaultConfig(object):
         """ Other than validating the inputs in the setter methods, here we evaluate what is
         mandatory. """
         if not self.interface or not self.db_name:
-            print("Error reading section %s" % self.name)
+            # print("Error reading section %s. Missing parameters." % self.name)
             return False
 
         if not self.enable:
@@ -308,7 +328,7 @@ class MyDefaultConfig(object):
 
             elif isinstance(value, bool) and value is True:
                 # Boolean options have no values
-                params.append("--%s" % method)
+                params.append("--%s" % method.replace("_", "-"))
 
             # Remove default values
             elif (value and
@@ -317,7 +337,7 @@ class MyDefaultConfig(object):
 
                 if ((self.mode == 1 and
                      method not in ["queue_occ", "flow_latency", "hop_latency", "save_interval"]) or
-                        (self.mode == 2 and method not in ["save_interval"]) or self.mode == 0):
+                        (self.mode == 2 and method not in ["counters_interval"]) or self.mode == 0):
 
                     params.append("--%s=%s" % (method.replace("_", "-"), value))
 
