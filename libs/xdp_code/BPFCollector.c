@@ -198,6 +198,11 @@ struct egr_tx_info_t {
     u64 packets;
 };
 
+/* track sequence id for report loss */
+//struct report_sequence_t {
+//    u64 report_seq;
+//};
+
 // Events
 struct flow_info_t {
     u32 seqNumber;
@@ -217,6 +222,7 @@ struct flow_info_t {
     u8 is_flow;
     u16 is_hop_latency;
     u16 is_queue_occup;
+    u32 metadata;  // For debugs and future use
 };
 
 BPF_PERF_OUTPUT(events);
@@ -351,10 +357,10 @@ int collector(struct xdp_md *ctx) {
         CURSOR_ADVANCE_NO_PARSE(cursor, sizeof(*INT_data), data_end);
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
-        flow_info.queue_ids[i] = (ntohl(*INT_data) >> 8) & 0xff;
-        flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffffff;
+        flow_info.queue_ids[i] = (ntohl(*INT_data) >> 24) & 0xff;
         // Validation against damaged reports
-        if ((ntohl(*INT_data) >> 8) & 0xff > 7) goto ERROR;
+        if (flow_info.queue_ids[i] > 7) goto ERROR;
+        flow_info.queue_occups[i] = ntohl(*INT_data) & 0xffffff;
 
         CURSOR_ADVANCE(INT_data, cursor, sizeof(*INT_data), data_end);
         flow_info.ingr_times[i] = ntohl(*INT_data);
