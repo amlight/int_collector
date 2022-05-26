@@ -59,9 +59,10 @@ def start_collector_instance():
 
     # If db_name is needs to be recreated
     if args.drop_db:
-        if args.db_name in collector.client.get_list_database():
-            collector.client.drop_db_name(args.db_name)
-        collector.client.create_database(args.db_name)
+        for db_entry in collector.client.get_list_database():
+            if args.db_name in db_entry["name"]:
+                collector.client.drop_database(args.db_name)
+            collector.client.create_database(args.db_name)
 
     push_stop_flag = threading.Event()
 
