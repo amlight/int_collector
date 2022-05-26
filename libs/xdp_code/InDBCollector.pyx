@@ -43,6 +43,7 @@ cdef struct Event:
     unsigned char  is_flow
     unsigned short  is_hop_latency
     unsigned short  is_queue_occup
+    unsigned int metadata
 
 
 class Collector(object):
@@ -67,7 +68,7 @@ class Collector(object):
         self.hop_latency = hop_latency
         self.flow_latency = flow_latency
         self.queue_occ = queue_occ
-        self.flow_keepalive = flow_keepalive
+        self.flow_keepalive = flow_keepalive * 1000000000  # convert to nanoseconds
         self.enable_counter_mode = enable_counter_mode
         self.enable_threshold_mode = enable_threshold_mode
 
@@ -105,8 +106,9 @@ class Collector(object):
 
         self.debug_mode = debug_int
 
-        self.flags = 0 | (1 << 3) if flags else 0
-
+        # xdp-mode is ignored because NICs don't support PERF when offloaded.
+        # Refer to issue #31
+        self.flags = 4
 
     def attach_iface(self, iface):
         if iface in self.ifaces:
@@ -158,6 +160,7 @@ class Collector(object):
                 print(f"is_flow: {event.is_flow}")
                 print(f"is_hop_latency: {event.is_hop_latency}")
                 print(f"is_queue_occup: {event.is_queue_occup}")
+                print(f"metadata: {event.metadata}")
 
             event_data = []
 
