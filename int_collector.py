@@ -42,6 +42,20 @@ for instance in instances:
     cmd = full_path + str(instance)
     # Split the options in Shell format
     cmds = shlex.split(cmd)
+
+    # Add option for --numa-group
+    # If --numa-group is provided, use the value provided with Linux command numaclt as below:
+    #   numactl -C <VALUE> python3 ....
+    numa_value = None
+    for cmd in cmds:
+        if "--numa-group=" in cmd:
+            numa_value = cmd.split("=")[1]
+
+    if isinstance(numa_value, int):
+        cmds.insert(0, str(numa_value))
+        cmds.insert(0, "-C")
+        cmds.insert(0, "/usr/bin/numactl")
+
     # Start the instance as a process in background
     process = subprocess.Popen(cmds, start_new_session=True)  # pylint: disable=R1732
 
