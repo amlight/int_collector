@@ -611,5 +611,6 @@ PASS:
 ERROR:
     value = 3;
     counter_error.increment(value);
-    return XDP_DROP;
+    // Send to user-space for further investigation.
+    return XDP_PASS;
 }
