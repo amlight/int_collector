@@ -413,9 +413,8 @@ int collector(struct xdp_md *ctx) {
             case 6: flow_info.is_hop_latency = 0x3f; break;
             case 7: flow_info.is_hop_latency = 0x7f; break;
             case 8: flow_info.is_hop_latency = 0xff; break;
-             // FIX01: MAX 8 for now
-            // case 9: flow_info.is_hop_latency = 0x1ff; break;
-            // case 10: flow_info.is_hop_latency = 0x3ff; break;
+            case 9: flow_info.is_hop_latency = 0x1ff; break;
+            case 10: flow_info.is_hop_latency = 0x3ff; break;
             default: break;
         }
 
