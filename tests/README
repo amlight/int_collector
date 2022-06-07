@@ -1,0 +1,55 @@
+
+What to test?
+
+1. Thresholds for queue occupancy
+
+A. T = 10 cells
+B. T = 20 cells
+C. T = 50 cells
+D. T = 100 cells
+
+2. Keepalive for queue occupancy
+
+A. K = 1 s
+B. K = 2 s
+C. K = 5 s
+
+3. Thresholds for hop delay
+
+A. T = 10,000 ns
+B. T = 20,000 ns
+C. T = 50,000 ns
+D. T = 100,000 ns
+
+4. Keepalive for hop delay
+
+A. K = 1 s
+B. K = 2 s
+C. K = 5 s
+
+5. Thresholds for flow latency
+
+A. T = 50,000 ns
+B. T = 80,000 ns
+C. T = 100,000 ns
+D. T = 500,000 ns
+
+6. Keepalive for flow latency
+
+A. K = 1 s
+B. K = 2 s
+C. K = 5 s
+
+7. Proof of transit
+
+A. 1 switch
+B. 2 switch
+C. 3 switch
+D. 4 switch
+E. 5 switch
+F. 6 switch
+G. 7 switch
+H. 8 switch
+
+8. Counters
+
