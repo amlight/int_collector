@@ -156,25 +156,25 @@ class Collector(object):
                 print(f"egr_times: {event.egr_times}")
                 print(f"flow_latency: {event.flow_latency}")
                 print(f"flow_sink_time: {event.flow_sink_time}")
-                print(f"is_n_flow: { event.is_n_flow}")
-                print(f"is_flow: {event.is_flow}")
-                print(f"is_hop_latency: {event.is_hop_latency}")
-                print(f"is_queue_occup: {event.is_queue_occup}")
+                print("is_n_flow: %s" % format(event.is_n_flow, 'b').zfill(16))
+                print("is_flow: %s" % format(event.is_flow, 'b').zfill(16))
+                print("is_hop_latency: %s" % format(event.is_hop_latency, 'b').zfill(16))
+                print("is_queue_occup: %s" % format(event.is_queue_occup, 'b').zfill(16))
                 print(f"metadata: {event.metadata}")
 
             event_data = []
 
-            # Commented out because by April 2021, there is only one switch.
-            # if event.is_n_flow or event.is_flow:
-            #     path_str = ":".join(str(event.sw_ids[i]) for i in reversed(range(0, event.num_INT_hop)))
-            #
-            #     event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,port=%d flow_latency=%d,path=\"%s\"%s" % (
-            #                         event.vlan_id,
-            #                         event.sw_ids[0],
-            #                         event.e_port_ids[0],
-            #                         event.flow_latency,
-            #                         path_str,
-            #                         int(round(time.time() * 1000000000)))))
+            if event.is_n_flow or event.is_flow:
+
+                path_str = ",".join(str(f"{event.in_port_ids[i]}-{event.sw_ids[i]}-{event.e_port_ids[i]}.{event.queue_ids[i]}") for i in reversed(range(0, event.num_INT_hop)))
+
+                event_data.append(u"flow_lat_path\\,vlan_id=%d\\,sw_id=%i\\,port=%d flow_latency=%d,path=\"%s\" %s" % (
+                                    event.vlan_id,
+                                    event.sw_ids[0],
+                                    event.e_port_ids[0],
+                                    event.flow_latency,
+                                    path_str,
+                                    int(round(time.time() * 1000000000))))
 
             if event.is_hop_latency:
                 for i in range(0, event.num_INT_hop):
