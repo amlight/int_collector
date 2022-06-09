@@ -198,10 +198,9 @@ struct egr_tx_info_t {
     u64 packets;
 };
 
-/* track sequence id for report loss */
-//struct report_sequence_t {
-//    u64 report_seq;
-//};
+struct last_tm_report_t {
+  int value;
+};
 
 // Events
 struct flow_info_t {
@@ -233,10 +232,12 @@ BPF_TABLE("lru_hash", struct queue_id_t, struct queue_info_t, tb_queue, 3200);
 BPF_TABLE("lru_hash", struct egress_eg_q_vlan_id_t, struct egr_tx_info_t, tb_egr_vlan_util, 5120);
 BPF_TABLE("lru_hash", struct egress_queue_util_id_t, struct egr_tx_info_t, tb_egr_queue_util, 520);
 BPF_TABLE("lru_hash", struct egress_util_id_t, struct egr_tx_info_t, tb_egr_interface_util, 400);
+BPF_HASH(tb_report_seq, int, struct last_tm_report_t, 1);
 
 BPF_HISTOGRAM(counter_all, u64);
 BPF_HISTOGRAM(counter_int, u64);
 BPF_HISTOGRAM(counter_error, u64);
+BPF_HISTOGRAM(counter_missing, u64);
 
 //--------------------------------------------------------------------
 
@@ -279,12 +280,29 @@ int collector(struct xdp_md *ctx) {
     struct telemetry_report_v10_t *tm_rp;
     CURSOR_ADVANCE(tm_rp, cursor, sizeof(*tm_rp), data_end);
 
+    // Track the telemetry report sequence number searching for missing reports.
+    u32 current_seq_number = ntohl(tm_rp->seqNumber), one = 1;
+    struct last_tm_report_t *last_seq_number = tb_report_seq.lookup(&one);
+
+    if (unlikely(!last_seq_number)){
+        tb_report_seq.update(&one, &current_seq_number);
+    }
+    else {
+        u32 diff = ABS(current_seq_number, last_seq_number->value);
+        if (diff > 1) {
+                value = 4;  // Report missing received == 0
+                counter_missing.increment(value, diff - 1);
+        }
+        tb_report_seq.update(&one, &current_seq_number);
+    }
+
     /*
         Parse Inner: Ether->Vlan->[Vlan]->IP->UDP/TCP->INT.
         we only consider Telemetry report with INT
     */
 
     CURSOR_ADVANCE_NO_PARSE(cursor, ETH_SIZE, data_end);
+    // At least one VLAN is mandatory.
     CURSOR_ADVANCE(vlan, cursor, sizeof(*vlan), data_end);
 
     // Consider an extra VLAN (QinQ)

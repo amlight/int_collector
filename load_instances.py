@@ -110,6 +110,9 @@ def start_collector_instance():
             for k, v in sorted(collector.packet_counter_errors.items()):
                 event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
 
+            for k, v in sorted(collector.packet_counter_missing.items()):
+                event_data.append("int_reports\\,type\\=%d value=%d" % (k.value, v.value))
+
             for k, v in collector.tb_egr.items():
                 insert = "tx_octs\\,sw\\=%d\\,port\\=%d\\,queue\\=%d\\,vlan\\=%d value=%d"
                 event_data.append(insert % (k.sw_id, k.p_id, k.q_id, k.v_id, v.octets))

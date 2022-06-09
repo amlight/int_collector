@@ -98,6 +98,7 @@ class Collector(object):
         self.packet_counter_all = self.bpf_collector.get_table("counter_all")
         self.packet_counter_int = self.bpf_collector.get_table("counter_int")
         self.packet_counter_errors = self.bpf_collector.get_table("counter_error")
+        self.packet_counter_missing = self.bpf_collector.get_table("counter_missing")
 
         self.lock = threading.Lock()
         self.event_data = []

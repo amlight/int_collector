@@ -152,40 +152,55 @@ class TestE2E(unittest.TestCase):
             '23-1-1.6'
         assert point["path"] == p
 
-    # @setup_env()
-    # def test_lost_int_repot(self) -> None:
-    #     """ Test if the controller can support 10 metadata """
-    #
-    #     def gen_pcks(tm_rp_seq):
-    #         p = generate_packet(tm_rp_seq=tm_rp_seq)
-    #         print(p.show())
-    #         send_packet(p)
-    #
-    #     # First round
-    #     gen_pcks(tm_rp_seq=1)
-    #     gen_pcks(tm_rp_seq=2)
-    #     gen_pcks(tm_rp_seq=4)
-    #     gen_pcks(tm_rp_seq=5)
-    #     gen_pcks(tm_rp_seq=7)
-    #     gen_pcks(tm_rp_seq=9)
-    #
-    #     time.sleep(2)
-    #
-    #     int_report_type_4 = False
-    #     for measurement in self.db_handler.get_list_measurements():
-    #         if measurement['name'] == "int_reports,type=4":
-    #             int_report_type_4 = True
-    #
-    #     assert int_report_type_4 is True
-    #
-    #     r = self.db_handler.query("select count(*) from \"int_reports,type=4\"")
-    #     point = next(r.get_points())
-    #     assert point["count_value"] == 3
+    @setup_env
+    def test_lost_int_report(self) -> None:
+        """ Test if the controller can support 10 metadata """
+
+        def gen_pcks(tm_rp_seq):
+            p = generate_packet(tm_rp_seq=tm_rp_seq)
+            # print(p.show())
+            send_packet(p)
+
+        # First round
+        gen_pcks(tm_rp_seq=1)
+        gen_pcks(tm_rp_seq=2)
+        gen_pcks(tm_rp_seq=4)
+        gen_pcks(tm_rp_seq=6)
+        gen_pcks(tm_rp_seq=9)
+        gen_pcks(tm_rp_seq=11)
+        gen_pcks(tm_rp_seq=12)
+        gen_pcks(tm_rp_seq=15)
+
+        time.sleep(2)
+
+        int_report_type_4 = False
+        for measurement in self.db_handler.get_list_measurements():
+            if measurement['name'] == "int_reports,type=4":
+                int_report_type_4 = True
+
+        assert int_report_type_4 is True
+
+        r = self.db_handler.query("select * from \"int_reports,type=4\""
+                                  "GROUP BY * ORDER BY DESC LIMIT 1")
+        point = next(r.get_points())
+        assert point["value"] == 7
+
+        # Second round
+        gen_pcks(tm_rp_seq=16)
+        gen_pcks(tm_rp_seq=20)
+        gen_pcks(tm_rp_seq=22)
+
+        time.sleep(2)
+
+        r = self.db_handler.query("select * from \"int_reports,type=4\""
+                                  "GROUP BY * ORDER BY DESC LIMIT 1")
+        point = next(r.get_points())
+        assert point["value"] == 11
 
 
 if __name__ == "__main__":
     a = TestE2E()
     a.setUp()
-    # a.test_queue_occupancy_variation()
+    a.test_queue_occupancy_variation()
     # a.test_multiple_ten_metadata()
-    # a.test_lost_int_repot()
+    # a.test_lost_int_report()
